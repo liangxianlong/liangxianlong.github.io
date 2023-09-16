@@ -2,17 +2,17 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>Caesar的博客</title>
-        <link>https://caesar.com/</link>
+        <link>https://liangxianlong.github.io/</link>
         <description>Recent content on Caesar的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>All Rights Reserved</copyright>
-        <lastBuildDate>Fri, 15 Sep 2023 18:11:10 +0800</lastBuildDate><atom:link href="https://caesar.com/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 15 Sep 2023 18:11:10 +0800</lastBuildDate><atom:link href="https://liangxianlong.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>VFS核心对象</title>
-        <link>https://caesar.com/post/kernel/fs/vfs%E6%A0%B8%E5%BF%83%E5%AF%B9%E8%B1%A1/</link>
+        <link>https://liangxianlong.github.io/post/kernel/fs/vfs%E6%A0%B8%E5%BF%83%E5%AF%B9%E8%B1%A1/</link>
         <pubDate>Fri, 15 Sep 2023 18:11:10 +0800</pubDate>
         
-        <guid>https://caesar.com/post/kernel/fs/vfs%E6%A0%B8%E5%BF%83%E5%AF%B9%E8%B1%A1/</guid>
+        <guid>https://liangxianlong.github.io/post/kernel/fs/vfs%E6%A0%B8%E5%BF%83%E5%AF%B9%E8%B1%A1/</guid>
         <description>&lt;h2 id=&#34;文件对象&#34;&gt;文件对象&lt;/h2&gt;
 &lt;p&gt;对一个目录项打开多次产生多个文件对象，每个文件对象又可以由多个文件描述符索引用。文件对象没有直接的磁盘映射内容，所以也没有表示自己是否为脏的标记。&lt;/p&gt;
 &lt;h3 id=&#34;文件对象结构体&#34;&gt;文件对象结构体&lt;/h3&gt;
@@ -1675,10 +1675,10 @@
         </item>
         <item>
         <title>文件系统的抽象层次</title>
-        <link>https://caesar.com/post/kernel/fs/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%8A%BD%E8%B1%A1%E5%B1%82%E6%AC%A1/</link>
+        <link>https://liangxianlong.github.io/post/kernel/fs/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%8A%BD%E8%B1%A1%E5%B1%82%E6%AC%A1/</link>
         <pubDate>Fri, 15 Sep 2023 16:27:20 +0800</pubDate>
         
-        <guid>https://caesar.com/post/kernel/fs/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%8A%BD%E8%B1%A1%E5%B1%82%E6%AC%A1/</guid>
+        <guid>https://liangxianlong.github.io/post/kernel/fs/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%8A%BD%E8%B1%A1%E5%B1%82%E6%AC%A1/</guid>
         <description>&lt;p&gt;可以从用户进程、&lt;code&gt;Linux&lt;/code&gt;内核、磁盘三个视角来观察。&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;
@@ -1977,27 +1977,27 @@
         </item>
         <item>
         <title>归档</title>
-        <link>https://caesar.com/page/archives/</link>
+        <link>https://liangxianlong.github.io/page/archives/</link>
         <pubDate>Tue, 28 May 2019 00:00:00 +0000</pubDate>
         
-        <guid>https://caesar.com/page/archives/</guid>
+        <guid>https://liangxianlong.github.io/page/archives/</guid>
         <description></description>
         </item>
         <item>
         <title>关于</title>
-        <link>https://caesar.com/page/about/</link>
+        <link>https://liangxianlong.github.io/page/about/</link>
         <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
         
-        <guid>https://caesar.com/page/about/</guid>
+        <guid>https://liangxianlong.github.io/page/about/</guid>
         <description>&lt;p&gt;记录技术以及生活&lt;/p&gt;
 </description>
         </item>
         <item>
         <title>链接</title>
-        <link>https://caesar.com/page/links/</link>
+        <link>https://liangxianlong.github.io/page/links/</link>
         <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
         
-        <guid>https://caesar.com/page/links/</guid>
+        <guid>https://liangxianlong.github.io/page/links/</guid>
         <description>&lt;p&gt;To use this feature, add &lt;code&gt;links&lt;/code&gt; section to frontmatter.&lt;/p&gt;
 &lt;p&gt;This page&amp;rsquo;s frontmatter:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div style=&#34;background-color:#eed;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;
@@ -2029,10 +2029,10 @@
         </item>
         <item>
         <title>搜索</title>
-        <link>https://caesar.com/page/search/</link>
+        <link>https://liangxianlong.github.io/page/search/</link>
         <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
         
-        <guid>https://caesar.com/page/search/</guid>
+        <guid>https://liangxianlong.github.io/page/search/</guid>
         <description></description>
         </item>
         

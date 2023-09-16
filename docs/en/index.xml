@@ -2,10 +2,10 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>Caesar&#39;s Blog</title>
-        <link>https://caesar.com/en/</link>
+        <link>https://liangxianlong.github.io/en/</link>
         <description>Recent content on Caesar&#39;s Blog</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>en</language>
-        <copyright>All Rights Reserved</copyright><atom:link href="https://caesar.com/en/index.xml" rel="self" type="application/rss+xml" />
+        <copyright>All Rights Reserved</copyright><atom:link href="https://liangxianlong.github.io/en/index.xml" rel="self" type="application/rss+xml" />
     </channel>
 </rss>

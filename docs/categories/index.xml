@@ -2,26 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>Categories on Caesar的博客</title>
-        <link>https://caesar.com/categories/</link>
+        <link>https://liangxianlong.github.io/categories/</link>
         <description>Recent content in Categories on Caesar的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>All Rights Reserved</copyright>
-        <lastBuildDate>Fri, 15 Sep 2023 18:11:10 +0800</lastBuildDate><atom:link href="https://caesar.com/categories/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 15 Sep 2023 18:11:10 +0800</lastBuildDate><atom:link href="https://liangxianlong.github.io/categories/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>kernel-fs</title>
-        <link>https://caesar.com/categories/kernel-fs/</link>
+        <link>https://liangxianlong.github.io/categories/kernel-fs/</link>
         <pubDate>Fri, 15 Sep 2023 18:11:10 +0800</pubDate>
         
-        <guid>https://caesar.com/categories/kernel-fs/</guid>
+        <guid>https://liangxianlong.github.io/categories/kernel-fs/</guid>
         <description></description>
-        </item>
-        <item>
-        <title>Test</title>
-        <link>https://caesar.com/categories/test/</link>
-        <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-        
-        <guid>https://caesar.com/categories/test/</guid>
-        <description>&lt;img src="https://caesar.com/categories/test/hutomo-abrianto-l2jk-uxb1BY-unsplash.jpg" alt="Featured image of post Test" /&gt;</description>
         </item>
         
     </channel>

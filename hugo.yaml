@@ -17,7 +17,7 @@ languages:
 disqusShortname: stack
 
 # GA Tracking ID
-googleAnalytics:
+googleAnalytics: G-P8CN7B3LZF
 
 publishDir: docs
 # Theme i18n support

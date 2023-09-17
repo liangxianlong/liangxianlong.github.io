@@ -7,7 +7,15 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>All Rights Reserved</copyright>
-        <lastBuildDate>Fri, 15 Sep 2023 18:11:10 +0800</lastBuildDate><atom:link href="https://liangxianlong.github.io/categories/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 17 Sep 2023 14:45:20 +0800</lastBuildDate><atom:link href="https://liangxianlong.github.io/categories/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>kernel-virtuallization</title>
+        <link>https://liangxianlong.github.io/categories/kernel-virtuallization/</link>
+        <pubDate>Sun, 17 Sep 2023 14:45:20 +0800</pubDate>
+        
+        <guid>https://liangxianlong.github.io/categories/kernel-virtuallization/</guid>
+        <description></description>
+        </item>
+        <item>
         <title>kernel-fs</title>
         <link>https://liangxianlong.github.io/categories/kernel-fs/</link>
         <pubDate>Fri, 15 Sep 2023 18:11:10 +0800</pubDate>

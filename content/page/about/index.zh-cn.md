@@ -7,5 +7,5 @@ menu:
             icon: user
 ---
 
-记录技术以及生活
+专注于容器(docker、containerd、kata-container)、内核以及虚拟化技术。联系方式见主页。
 

@@ -28,10 +28,6 @@ DefaultContentLanguage: zh-cn
 # This will make .Summary and .WordCount behave correctly for CJK languages.
 hasCJKLanguage: true
 
-#permalinks:
-#post: /p/:slug/
-#    page: /:slug/
-
 params:
     mainSections:
         - post
@@ -49,7 +45,7 @@ params:
 
     sidebar:
         emoji: 🍥
-        subtitle: 专注于容器(docker、containerd、kata-container)及虚拟化技术.
+        subtitle: 悟已往之不谏，知來者之可追.
         avatar:
             enabled: true
             local: true

@@ -50,7 +50,7 @@ int main() {
 
 5. `ksoftirqd`内核线程检测到有软中断请求到达，调用`poll`开始轮询收包，最后交由各级协议栈处理。
 
-## 网络子系统初始化
+## Linux启动
 
 在真正能处理外部数据帧之前，内核协议栈、网卡驱动需要做很多的准备工作。
 
@@ -215,4 +215,162 @@ struct softirq_action
 
 ### 协议栈注册
 
-内核实现了网络层的`IP`协议，也实现了传输层的`TCP`协议和`UDP`协议。内核通过`fs_initcall`
+内核实现了网络层的`IP`协议，也实现了传输层的`TCP`协议和`UDP`协议。内核通过`fs_initcall`调用`inet_init`来完成协议栈的一系列初始化：
+
+- 注册协议栈各层的处理函数。
+
+- 添加主要的协议。
+
+- 初始化各层协议。
+
+具体可参加如下图：
+
+<img title="" src="proto_stack_register.png" alt="loading-ag-889" data-align="center">
+
+`tcp_prot`定义指定了`TCP`协议栈的接口函数，用户态的系统调用最终会调用到对应的如下函数：
+
+```c
+struct proto tcp_prot = {
+	.name			= "TCP",
+	.owner			= THIS_MODULE,
+	.close			= tcp_close,
+	.pre_connect		= tcp_v4_pre_connect,
+	.connect		= tcp_v4_connect,
+	.disconnect		= tcp_disconnect,
+	.accept			= inet_csk_accept,
+	.ioctl			= tcp_ioctl,
+	.init			= tcp_v4_init_sock,
+	.destroy		= tcp_v4_destroy_sock,
+	.shutdown		= tcp_shutdown,
+	.setsockopt		= tcp_setsockopt,
+	.getsockopt		= tcp_getsockopt,
+	.bpf_bypass_getsockopt	= tcp_bpf_bypass_getsockopt,
+	.keepalive		= tcp_set_keepalive,
+	.recvmsg		= tcp_recvmsg,
+	.sendmsg		= tcp_sendmsg,
+	.sendpage		= tcp_sendpage,
+	.backlog_rcv		= tcp_v4_do_rcv,
+	.release_cb		= tcp_release_cb,
+	.hash			= inet_hash,
+	.unhash			= inet_unhash,
+	.get_port		= inet_csk_get_port,
+	.enter_memory_pressure	= tcp_enter_memory_pressure,
+	.leave_memory_pressure	= tcp_leave_memory_pressure,
+	.stream_memory_free	= tcp_stream_memory_free,
+	.sockets_allocated	= &tcp_sockets_allocated,
+	.orphan_count		= &tcp_orphan_count,
+	.memory_allocated	= &tcp_memory_allocated,
+	.memory_pressure	= &tcp_memory_pressure,
+	.sysctl_mem		= sysctl_tcp_mem,
+	.sysctl_wmem_offset	= offsetof(struct net, ipv4.sysctl_tcp_wmem),
+	.sysctl_rmem_offset	= offsetof(struct net, ipv4.sysctl_tcp_rmem),
+	.max_header		= MAX_TCP_HEADER,
+	.obj_size		= sizeof(struct tcp_sock),
+	.slab_flags		= SLAB_TYPESAFE_BY_RCU,
+	.twsk_prot		= &tcp_timewait_sock_ops,
+	.rsk_prot		= &tcp_request_sock_ops,
+	.h.hashinfo		= &tcp_hashinfo,
+	.no_autobind		= true,
+	.diag_destroy		= tcp_abort,
+};
+EXPORT_SYMBOL(tcp_prot);
+```
+
+`inet_add_protocol(&tcp_protocol, IPPROTO_TCP)`将`tcp_v4_rcv`注册到`inet_protos`数组中。当有`TCP`数据报文到达时，`ip`层会调用此`tcp_v4_rcv`用于接收数据报文。总的来看`inet_add_protocol`函数将`TCP`和`UDP`对应的数据报文接收函数注册到`inet_protos`数组中。
+
+```c
+int inet_add_protocol(const struct net_protocol *prot, unsigned char protocol)
+{
+	if (!prot->netns_ok) {
+		pr_err("Protocol %u is not namespace aware, cannot register.\n",
+			protocol);
+		return -EINVAL;
+	}
+
+	return !cmpxchg((const struct net_protocol **)&inet_protos[protocol],
+			NULL, prot) ? 0 : -1;
+}
+```
+
+对于`IP`报文，函数`dev_add_pack(&ip_packet_type)`将`ip_rcv`注册到`ptype_base`哈希表中。当有`IP`报文到达时，调用`ip_rcv`进行处理。`ip_packet_type`定义如下，此处`type`定义为`#define ETH_P_IP 0x0800`：
+
+```c
+static struct packet_type ip_packet_type __read_mostly = {
+	.type = cpu_to_be16(ETH_P_IP),
+	.func = ip_rcv,
+	.list_func = ip_list_rcv,
+};
+```
+
+`dev_add_pack`函数实现如下：
+
+```c
+void dev_add_pack(struct packet_type *pt)
+{
+	struct list_head *head = ptype_head(pt);
+
+	spin_lock(&ptype_lock);
+	list_add_rcu(&pt->list, head);
+	spin_unlock(&ptype_lock);
+}
+EXPORT_SYMBOL(dev_add_pack);
+```
+
+```c
+static inline struct list_head *ptype_head(const struct packet_type *pt)
+{
+	if (pt->type == htons(ETH_P_ALL))
+		return pt->dev ? &pt->dev->ptype_all : &ptype_all;
+	else
+		return pt->dev ? &pt->dev->ptype_specific :
+				 &ptype_base[ntohs(pt->type) & PTYPE_HASH_MASK];
+}
+```
+
+软中断通过`ptype_base`找到`ip_rcv`的函数地址，进而将`IP`报文正确的送到`ip_rcv`中执行。在`ip_rcv`中通过`inet_protos`找到`TCP`或者`UDP`的处理函数地址，然后把包转发给`tcp_v4_rcv`或者`udp_rcv`函数。
+
+### 网卡驱动初始化
+
+驱动程序使用`module_init`向内核注册一个初始化函数，当驱动程序被加载时，内核会调用这个函数。如下为`ixgbe`网卡定义的相关操作函数:
+
+```c
+static struct pci_driver ixgbe_driver = {
+	.name      = ixgbe_driver_name,
+	.id_table  = ixgbe_pci_tbl,
+	.probe     = ixgbe_probe,
+	.remove    = ixgbe_remove,
+	.driver.pm = &ixgbe_pm_ops,
+	.shutdown  = ixgbe_shutdown,
+	.sriov_configure = ixgbe_pci_sriov_configure,
+	.err_handler = &ixgbe_err_handler
+};
+```
+
+当内核加载`ixgbe`网卡驱动时，会调用`ixgbe_init_module`:
+
+```c
+/**
+ * ixgbe_init_module - Driver Registration Routine
+ *
+ * ixgbe_init_module is the first routine called when the driver is
+ * loaded. All it does is register with the PCI subsystem.
+ **/
+static int __init ixgbe_init_module(void)
+{
+	int ret;
+	...
+	ixgbe_wq = create_singlethread_workqueue(ixgbe_driver_name);
+	...
+	ret = pci_register_driver(&ixgbe_driver);
+    ...
+#ifdef CONFIG_IXGBE_DCA
+	dca_register_notify(&dca_notifier);
+#endif
+
+	return 0;
+}
+
+module_init(ixgbe_init_module);
+```
+
+`ixgbe_init_module`会调用`pci_register_driver(&ixgbe_driver)`后，内核就知道`ixgbe`网卡驱动的`ixgbe_driver_name`和`ixgbe_probe`等函数地址以及其他一些驱动信息。网卡驱动被识别后，内核会调用其`probe`方法(`ixgbe_probe`)让网卡设备处于就绪状态。对于`ixgbe`网卡，其`ixgbe_probe`位于`drivers/net/ethernet/intel/ixgbe/ixgbe_main.c`。加载`ixgbe`网卡驱动时函数`ixgbe_probe`主要操作如下所示：

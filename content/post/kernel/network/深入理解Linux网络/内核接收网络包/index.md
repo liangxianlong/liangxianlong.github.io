@@ -373,4 +373,328 @@ static int __init ixgbe_init_module(void)
 module_init(ixgbe_init_module);
 ```
 
-`ixgbe_init_module`会调用`pci_register_driver(&ixgbe_driver)`后，内核就知道`ixgbe`网卡驱动的`ixgbe_driver_name`和`ixgbe_probe`等函数地址以及其他一些驱动信息。网卡驱动被识别后，内核会调用其`probe`方法(`ixgbe_probe`)让网卡设备处于就绪状态。对于`ixgbe`网卡，其`ixgbe_probe`位于`drivers/net/ethernet/intel/ixgbe/ixgbe_main.c`。加载`ixgbe`网卡驱动时函数`ixgbe_probe`主要操作如下所示：
+`ixgbe_init_module`调用`pci_register_driver(&ixgbe_driver)`后，内核就知道`ixgbe`网卡驱动的`ixgbe_driver_name`和`ixgbe_probe`等函数地址以及其他一些驱动信息。网卡驱动被识别后，内核会调用其`probe`方法(`ixgbe_probe`)让网卡设备处于就绪状态。对于`ixgbe`网卡，其`ixgbe_probe`位于`drivers/net/ethernet/intel/ixgbe/ixgbe_main.c`。加载`ixgbe`网卡驱动时函数`ixgbe_probe`主要操作如下所示：
+
+<img title="" src="nic_init.png" alt="kvm_ioctl.png" data-align="center">
+
+**dma_set_mask_and_coherent**
+
+`dma_set_mask_and_coherent`函数设置`ixgbe`网卡的`DMA`属掩码和一致性属性。
+
+**alloc_etherdev_mq**
+
+- 分配`struct net_device`结构体指针。
+
+- 设置相关的回调函数。
+
+- 初始化分配的`struct net_device`结构体指针某些字段。
+
+**netdev->netdev_ops = &ixgbe_netdev_ops**
+
+注册`ixgbe`网卡设备的操作函数：
+
+```c
+static const struct net_device_ops ixgbe_netdev_ops = {
+	.ndo_open		= ixgbe_open,
+	.ndo_stop		= ixgbe_close,
+	.ndo_start_xmit		= ixgbe_xmit_frame,
+	.ndo_set_rx_mode	= ixgbe_set_rx_mode,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= ixgbe_set_mac,
+	.ndo_change_mtu		= ixgbe_change_mtu,
+	.ndo_tx_timeout		= ixgbe_tx_timeout,
+	.ndo_set_tx_maxrate	= ixgbe_tx_maxrate,
+	.ndo_vlan_rx_add_vid	= ixgbe_vlan_rx_add_vid,
+	.ndo_vlan_rx_kill_vid	= ixgbe_vlan_rx_kill_vid,
+	.ndo_do_ioctl		= ixgbe_ioctl,
+	.ndo_set_vf_mac		= ixgbe_ndo_set_vf_mac,
+	.ndo_set_vf_vlan	= ixgbe_ndo_set_vf_vlan,
+	.ndo_set_vf_rate	= ixgbe_ndo_set_vf_bw,
+	.ndo_set_vf_spoofchk	= ixgbe_ndo_set_vf_spoofchk,
+	.ndo_set_vf_rss_query_en = ixgbe_ndo_set_vf_rss_query_en,
+	.ndo_set_vf_trust	= ixgbe_ndo_set_vf_trust,
+	.ndo_get_vf_config	= ixgbe_ndo_get_vf_config,
+	.ndo_get_stats64	= ixgbe_get_stats64,
+	.ndo_setup_tc		= __ixgbe_setup_tc,
+#ifdef IXGBE_FCOE
+	.ndo_select_queue	= ixgbe_select_queue,
+	.ndo_fcoe_ddp_setup = ixgbe_fcoe_ddp_get,
+	.ndo_fcoe_ddp_target = ixgbe_fcoe_ddp_target,
+	.ndo_fcoe_ddp_done = ixgbe_fcoe_ddp_put,
+	.ndo_fcoe_enable = ixgbe_fcoe_enable,
+	.ndo_fcoe_disable = ixgbe_fcoe_disable,
+	.ndo_fcoe_get_wwn = ixgbe_fcoe_get_wwn,
+	.ndo_fcoe_get_hbainfo = ixgbe_fcoe_get_hbainfo,
+#endif /* IXGBE_FCOE */
+	.ndo_set_features = ixgbe_set_features,
+	.ndo_fix_features = ixgbe_fix_features,
+	.ndo_fdb_add		= ixgbe_ndo_fdb_add,
+	.ndo_bridge_setlink	= ixgbe_ndo_bridge_setlink,
+	.ndo_bridge_getlink	= ixgbe_ndo_bridge_getlink,
+	.ndo_dfwd_add_station	= ixgbe_fwd_add,
+	.ndo_dfwd_del_station	= ixgbe_fwd_del,
+	.ndo_udp_tunnel_add	= udp_tunnel_nic_add_port,
+	.ndo_udp_tunnel_del	= udp_tunnel_nic_del_port,
+	.ndo_features_check	= ixgbe_features_check,
+	.ndo_bpf		= ixgbe_xdp,
+	.ndo_xdp_xmit		= ixgbe_xdp_xmit,
+	.ndo_xsk_wakeup         = ixgbe_xsk_wakeup,
+};
+```
+
+**ixgbe_set_ethtool_ops**
+
+设置`ixgbe`网卡的`ethtool`回调函数：
+
+```c
+void ixgbe_set_ethtool_ops(struct net_device *netdev)
+{
+	netdev->ethtool_ops = &ixgbe_ethtool_ops;
+}
+```
+
+`ixgbe_ethtool_ops`结构体定义如下：
+
+```c
+static const struct ethtool_ops ixgbe_ethtool_ops = {
+	.supported_coalesce_params = ETHTOOL_COALESCE_USECS,
+	.get_drvinfo            = ixgbe_get_drvinfo,
+	.get_regs_len           = ixgbe_get_regs_len,
+	.get_regs               = ixgbe_get_regs,
+	.get_wol                = ixgbe_get_wol,
+	.set_wol                = ixgbe_set_wol,
+	.nway_reset             = ixgbe_nway_reset,
+	.get_link               = ethtool_op_get_link,
+	.get_eeprom_len         = ixgbe_get_eeprom_len,
+	.get_eeprom             = ixgbe_get_eeprom,
+	.set_eeprom             = ixgbe_set_eeprom,
+	.get_ringparam          = ixgbe_get_ringparam,
+	.set_ringparam          = ixgbe_set_ringparam,
+	.get_pause_stats	= ixgbe_get_pause_stats,
+	.get_pauseparam         = ixgbe_get_pauseparam,
+	.set_pauseparam         = ixgbe_set_pauseparam,
+	.get_msglevel           = ixgbe_get_msglevel,
+	.set_msglevel           = ixgbe_set_msglevel,
+	.self_test              = ixgbe_diag_test,
+	.get_strings            = ixgbe_get_strings,
+	.set_phys_id            = ixgbe_set_phys_id,
+	.get_sset_count         = ixgbe_get_sset_count,
+	.get_ethtool_stats      = ixgbe_get_ethtool_stats,
+	.get_coalesce           = ixgbe_get_coalesce,
+	.set_coalesce           = ixgbe_set_coalesce,
+	.get_rxnfc		= ixgbe_get_rxnfc,
+	.set_rxnfc		= ixgbe_set_rxnfc,
+	.get_rxfh_indir_size	= ixgbe_rss_indir_size,
+	.get_rxfh_key_size	= ixgbe_get_rxfh_key_size,
+	.get_rxfh		= ixgbe_get_rxfh,
+	.set_rxfh		= ixgbe_set_rxfh,
+	.get_eee		= ixgbe_get_eee,
+	.set_eee		= ixgbe_set_eee,
+	.get_channels		= ixgbe_get_channels,
+	.set_channels		= ixgbe_set_channels,
+	.get_priv_flags		= ixgbe_get_priv_flags,
+	.set_priv_flags		= ixgbe_set_priv_flags,
+	.get_ts_info		= ixgbe_get_ts_info,
+	.get_module_info	= ixgbe_get_module_info,
+	.get_module_eeprom	= ixgbe_get_module_eeprom,
+	.get_link_ksettings     = ixgbe_get_link_ksettings,
+	.set_link_ksettings     = ixgbe_set_link_ksettings,
+};
+```
+
+如果使用`ethtool`命令对`ixgbe`网卡进行操作，最终会调用到`ixgbe_set_ethtool_ops`函数注册的回调函数上。因此，当使用`ethtool`命令查看网卡收发包统计、调整网卡`RX`队列的数量和大小是因为`ethtool`命令最终调用可网卡驱动的相应方法。
+
+**eth_platform_get_mac_address**
+
+`eth_platform_get_mac_address`函数获取网卡设备的`MAC`地址，并填充到`netdev->dev_addr`中。
+
+**ixgbe_init_interrupt_scheme**
+
+此函数负责初始化`ixgbe`网卡的中断方案。对于网卡设备来说正确初始化中断是及其重要的。如下所示为`ixgbe_init_interrupt_scheme`函数的调用关系图：
+
+<img title="" src="ixgbe_init_interrupt_scheme.png" alt="kvm_ioctl.png" data-align="center">
+
+可以看到`ixgbe_init_interrupt_scheme`最终会调用到``函数：
+
+```c
+/* initialize NAPI */
+netif_napi_add(adapter->netdev, &q_vector->napi,
+		       ixgbe_poll, 64);
+```
+
+`netif_napi_add`函数注册一个`NAPI`机制必须的函数。对于`ixgbe`网卡来说，这个函数是`ixgbe_poll`，用于轮询网卡接收队列，处理接收到的数据包。
+
+### 启动网卡
+
+上面的初始化流程都完成以后，就可以启动网卡了。在[`网卡驱动初始化`](#网卡驱动初始化)中注册了`ixgbe`网卡设备的操作函数，包含了网卡启用、发包、设置`MAC`地址等回调函数。
+
+```c
+static const struct net_device_ops ixgbe_netdev_ops = {
+    .ndo_open		= ixgbe_open,
+	.ndo_stop		= ixgbe_close,
+	.ndo_start_xmit		= ixgbe_xmit_frame,
+	.ndo_set_rx_mode	= ixgbe_set_rx_mode,
+	.ndo_validate_addr	= eth_validate_addr,
+    ...
+}
+```
+
+当执行`ifconfig enp97s0f0 up`时，`net_device_ops`变量中的`ndo_open`函数会被调用。对于`ixgbe`网卡而言，最终调用的是`ixgbe_open`方法：
+
+```c
+/**
+ * ixgbe_open - Called when a network interface is made active
+ * @netdev: network interface device structure
+ *
+ * Returns 0 on success, negative value on failure
+ *
+ * The open entry point is called when a network interface is made
+ * active by the system (IFF_UP).  At this point all resources needed
+ * for transmit and receive operations are allocated, the interrupt
+ * handler is registered with the OS, the watchdog timer is started,
+ * and the stack is notified that the interface is ready.
+ **/
+int ixgbe_open(struct net_device *netdev)
+{
+    ...
+	netif_carrier_off(netdev);
+
+	/* allocate transmit descriptors */
+    // 分配了RingBuffer，并建立内存和Tx队列的映射关系
+	err = ixgbe_setup_all_tx_resources(adapter);
+    ...
+	/* allocate receive descriptors */
+    // 分配了RingBuffer，并建立内存和Rx队列的映射关系
+	err = ixgbe_setup_all_rx_resources(adapter);
+	if (err)
+		goto err_setup_rx;
+
+	ixgbe_configure(adapter);
+    // 注册中断处理函数
+	err = ixgbe_request_irq(adapter);
+	if (err)
+		goto err_req_irq;
+
+	/* Notify the stack of the actual queue counts. */
+	queues = adapter->num_tx_queues;
+	err = netif_set_real_num_tx_queues(netdev, queues);
+    ...
+	queues = adapter->num_rx_queues;
+	err = netif_set_real_num_rx_queues(netdev, queues);
+    ...
+    // ixgbe_up_complete->ixgbe_napi_enable_all->napi_enable启用NAPI
+	ixgbe_up_complete(adapter);
+    ...
+}
+```
+
+**ixgbe_setup_all_rx_resources**
+
+在`ixgbe_open`中调用`ixgbe_setup_all_rx_resources`分配`RingBuffer`，并建立与内存的映射关系:
+
+```c
+/**
+ * ixgbe_setup_all_rx_resources - allocate all queues Rx resources
+ * @adapter: board private structure
+ *
+ * If this function returns with an error, then it's possible one or
+ * more of the rings is populated (while the rest are not).  It is the
+ * callers duty to clean those orphaned rings.
+ *
+ * Return 0 on success, negative on failure
+ **/
+static int ixgbe_setup_all_rx_resources(struct ixgbe_adapter *adapter)
+{
+	int i, err = 0;
+
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		err = ixgbe_setup_rx_resources(adapter, adapter->rx_ring[i]);
+		...
+	}
+    ...
+}
+```
+
+上面的循环中，创建了若干个发送队列和接收队列。下图所示为接收队列，发送队列类似。
+
+<img title="" src="tx_ringbuffer.png" alt="loading-ag-889" data-align="center">
+
+接下来看看每一个队列是如何创建出来的：
+
+```c
+/**
+ * ixgbe_setup_rx_resources - allocate Rx resources (Descriptors)
+ * @adapter: pointer to ixgbe_adapter
+ * @rx_ring:    rx descriptor ring (for a specific queue) to setup
+ *
+ * Returns 0 on success, negative on failure
+ **/
+int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
+			     struct ixgbe_ring *rx_ring)
+{
+	...
+    // ixgbe_rx_buffer的size
+	size = sizeof(struct ixgbe_rx_buffer) * rx_ring->count;
+
+	if (rx_ring->q_vector)
+		ring_node = rx_ring->q_vector->numa_node;
+    // 分配ixgbe_rx_buffer队列内存
+	rx_ring->rx_buffer_info = vmalloc_node(size, ring_node);
+	...
+	/* Round up to nearest 4K */
+    // 分配ixgbe_adv_rx_desc队列内存
+	rx_ring->size = rx_ring->count * sizeof(union ixgbe_adv_rx_desc);
+	rx_ring->size = ALIGN(rx_ring->size, 4096);
+	set_dev_node(dev, ring_node);
+	rx_ring->desc = dma_alloc_coherent(dev,
+					   rx_ring->size,
+					   &rx_ring->dma,
+					   GFP_KERNEL);
+	...
+    // 初始化队列成员
+	rx_ring->next_to_clean = 0;
+	rx_ring->next_to_use = 0;
+    ...
+}
+```
+
+通过上述代码可以看到，实际上一个`rx_ring`内部有两个环形队列，如下图所示：
+
+- **ixgbe_rx_buffer**数组：这个数组是内核使用，通过`vmalloc_node`申请的。
+
+- **ixgbe_adv_rx_desc**：这个数组是网卡硬件使用的，通过`dma_alloc_coherent`分配。
+
+<img title="" src="tx_buffer_internal.png" alt="loading-ag-889" data-align="center">
+
+**ixgbe_request_irq**
+
+接下来使用`ixgbe_request_irq`注册中断:
+
+```c
+/**
+ * ixgbe_request_irq - initialize interrupts
+ * @adapter: board private structure
+ *
+ * Attempts to configure interrupts using the best available
+ * capabilities of the hardware and kernel.
+ **/
+static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
+{
+	...
+	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED)
+		err = ixgbe_request_msix_irqs(adapter);
+	else if (adapter->flags & IXGBE_FLAG_MSI_ENABLED)
+		err = request_irq(adapter->pdev->irq, ixgbe_intr, 0,
+				  netdev->name, adapter);
+	else
+		err = request_irq(adapter->pdev->irq, ixgbe_intr, IRQF_SHARED,
+				  netdev->name, adapter);
+    ...
+}
+```
+
+## 数据包到达
+
+### 硬中断处理
+
+数据报文从网线到达网卡上的时候，首先到达网卡的接收队列。网卡会在之前分配的`rx_ring_buffer`中寻找可用的内存，找到后直接将数据报文`DMA`到网卡之前关联的内存里。`DMA`操作完成后，网卡会向`CPU`发起一个硬中断，通知`CPU`有数据到达。中断的处理流程如下：

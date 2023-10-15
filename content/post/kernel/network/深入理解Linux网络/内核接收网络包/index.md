@@ -115,7 +115,7 @@ out:
 EXPORT_SYMBOL_GPL(smpboot_register_percpu_thread);
 ```
 
-可以看到`smpboot_register_percpu_thread`会为每个`online CPU`创建对应的`ksoftirqd`内核线程，进入线程循环函数`ksoftirqd_should_run`和`run_ksoftirqd`。需要注意的是软中断不仅有网络软中断，还包括其他类型，参考如下：
+`smpboot_register_percpu_thread`会为每个`online CPU`创建对应的`ksoftirqd`内核线程，进入线程循环函数`ksoftirqd_should_run`和`run_ksoftirqd`。需要注意的是软中断不仅有网络软中断，还包括其他类型，参考如下：
 
 ```c
 enum
@@ -137,7 +137,7 @@ enum
 
 ### 网络子系统初始化
 
-在网络子系统的初始化过程中，会为每个`CPU`初始化`softnet_data`，也会为`NET_RX_SOFTIRQ`和`NET_RX_SOFTIRQ`注册处理函数，流程如下图所示：
+在网络子系统的初始化过程中，会为每个`CPU`初始化`softnet_data`，也会为`NET_RX_SOFTIRQ`和`NET_TX_SOFTIRQ`注册处理函数，流程如下图所示：
 
 <img title="" src="net_dev_init.png" alt="" data-align="center" width="1844">
 
@@ -145,7 +145,7 @@ enum
 
 - 为每一个`CPU`申请一个`softnet_data`数据结构，这个数据结构里的`poll_list`用于等待驱动程序将其`poll`函数注册进来。
 
-- 通过`open_softirq`为`NET_RX_SOFTIRQ`以及`NET_RX_SOFTIRQ`分别注册处理函数`net_rx_action`和`net_tx_action`。
+- 通过`open_softirq`为`NET_RX_SOFTIRQ`以及`NET_TX_SOFTIRQ`分别注册处理函数`net_rx_action`和`net_tx_action`。
 
 如下所示为相关代码：
 
@@ -157,14 +157,7 @@ static int __init net_dev_init(void)
         struct work_struct *flush = per_cpu_ptr(&flush_works, i);
         // 为当前cpu创建softnet_data数据
         struct softnet_data *sd = &per_cpu(softnet_data, i);
-
-        INIT_WORK(flush, flush_backlog);
-
-        skb_queue_head_init(&sd->input_pkt_queue);
-        skb_queue_head_init(&sd->process_queue);
-#ifdef CONFIG_XFRM_OFFLOAD
-        skb_queue_head_init(&sd->xfrm_backlog);
-#endif
+		...
         // 注册poll_list
         INIT_LIST_HEAD(&sd->poll_list);
         sd->output_queue_tailp = &sd->output_queue;
@@ -173,10 +166,7 @@ static int __init net_dev_init(void)
         sd->csd.info = sd;
         sd->cpu = i;
 #endif
-
-        init_gro_hash(&sd->backlog);
-        sd->backlog.poll = process_backlog;
-        sd->backlog.weight = weight_p;
+        ...
     }
     ...
     // 注册net_tx_action
@@ -251,32 +241,12 @@ struct proto tcp_prot = {
 	.sendpage		= tcp_sendpage,
 	.backlog_rcv		= tcp_v4_do_rcv,
 	.release_cb		= tcp_release_cb,
-	.hash			= inet_hash,
-	.unhash			= inet_unhash,
-	.get_port		= inet_csk_get_port,
-	.enter_memory_pressure	= tcp_enter_memory_pressure,
-	.leave_memory_pressure	= tcp_leave_memory_pressure,
-	.stream_memory_free	= tcp_stream_memory_free,
-	.sockets_allocated	= &tcp_sockets_allocated,
-	.orphan_count		= &tcp_orphan_count,
-	.memory_allocated	= &tcp_memory_allocated,
-	.memory_pressure	= &tcp_memory_pressure,
-	.sysctl_mem		= sysctl_tcp_mem,
-	.sysctl_wmem_offset	= offsetof(struct net, ipv4.sysctl_tcp_wmem),
-	.sysctl_rmem_offset	= offsetof(struct net, ipv4.sysctl_tcp_rmem),
-	.max_header		= MAX_TCP_HEADER,
-	.obj_size		= sizeof(struct tcp_sock),
-	.slab_flags		= SLAB_TYPESAFE_BY_RCU,
-	.twsk_prot		= &tcp_timewait_sock_ops,
-	.rsk_prot		= &tcp_request_sock_ops,
-	.h.hashinfo		= &tcp_hashinfo,
-	.no_autobind		= true,
-	.diag_destroy		= tcp_abort,
+    ...
 };
 EXPORT_SYMBOL(tcp_prot);
 ```
 
-`inet_add_protocol(&tcp_protocol, IPPROTO_TCP)`将`tcp_v4_rcv`注册到`inet_protos`数组中。当有`TCP`数据报文到达时，`ip`层会调用此`tcp_v4_rcv`用于接收数据报文。总的来看`inet_add_protocol`函数将`TCP`和`UDP`对应的数据报文接收函数注册到`inet_protos`数组中。
+`inet_add_protocol(&tcp_protocol, IPPROTO_TCP)`将`tcp_v4_rcv`注册到`inet_protos`数组中。当有`TCP`数据报文到达时，`IP`层会调用此`tcp_v4_rcv`用于接收数据报文。总的来看`inet_add_protocol`函数将`TCP`和`UDP`对应的数据报文接收函数注册到`inet_protos`数组中。
 
 ```c
 int inet_add_protocol(const struct net_protocol *prot, unsigned char protocol)
@@ -327,9 +297,53 @@ static inline struct list_head *ptype_head(const struct packet_type *pt)
 }
 ```
 
-软中断通过`ptype_base`找到`ip_rcv`的函数地址，进而将`IP`报文正确的送到`ip_rcv`中执行。在`ip_rcv`中通过`inet_protos`找到`TCP`或者`UDP`的处理函数地址，然后把包转发给`tcp_v4_rcv`或者`udp_rcv`函数。
+软中断通过`ptype_base`找到`ip_rcv`的函数地址，进而将`IP`报文正确的送到`ip_rcv`中执行。在`ip_rcv`中通过`inet_protos`找到`TCP`或者`UDP`的处理函数地址，然后把报文转发给`tcp_v4_rcv`或者`udp_rcv`函数。对于接受数据报文，还需要网卡驱动完成初始化并且网卡处于启动状态。
 
-### 网卡驱动初始化
+## 网卡驱动初始化
+
+驱动设备编译时，`MODULE_DEVICE_TABLE`宏会导出一个 global 的 `PCI` 设备 `ID` 列表， 驱动据此识别它可以控制哪些设备，这样内核就能对各设备加载正确的驱动:
+
+```c
+#ifdef MODULE
+/* Creates an alias so file2alias.c can find device table. */
+#define MODULE_DEVICE_TABLE(type, name)					\
+extern typeof(name) __mod_##type##__##name##_device_table		\
+  __attribute__ ((unused, alias(__stringify(name))))
+#else  /* !MODULE */
+#define MODULE_DEVICE_TABLE(type, name)
+#endif
+```
+
+`ixgbe`驱动的设备表和`PCI`设备`ID`:
+
+```c
+/* ixgbe_pci_tbl - PCI Device ID Table
+ *
+ * Wildcard entries (PCI_ANY_ID) should come last
+ * Last entry must be all 0s
+ *
+ * { Vendor ID, Device ID, SubVendor ID, SubDevice ID,
+ *   Class, Class Mask, private data (not used) }
+ */
+static const struct pci_device_id ixgbe_pci_tbl[] = {
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_DUAL_PORT), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_SINGLE_PORT), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT2), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_CX4), board_82598 },
+	...
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_XF_LR), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_SFP_LOM), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_BX), board_82598 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_KX4), board_82599 },
+	...
+	/* required last entry */
+	{0, }
+};
+MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
+```
 
 驱动程序使用`module_init`向内核注册一个初始化函数，当驱动程序被加载时，内核会调用这个函数。如下为`ixgbe`网卡定义的相关操作函数:
 
@@ -346,7 +360,7 @@ static struct pci_driver ixgbe_driver = {
 };
 ```
 
-当内核加载`ixgbe`网卡驱动时，会调用`ixgbe_init_module`:
+当内核加载`ixgbe`网卡驱动时`(比如使用insmod ixgbe或者modprobe ixgbe)`，会调用`ixgbe_init_module`:
 
 ```c
 /**
@@ -377,9 +391,18 @@ module_init(ixgbe_init_module);
 
 <img title="" src="nic_init.png" alt="kvm_ioctl.png" data-align="center">
 
+一般来说，网卡驱动`probe`的标准操作有:
+
+1. 使能`PCI`设备。
+2. 请求内存区域以及`IO`端口。
+3. 设置`DMA`掩码。
+4. 分配`struct net_device`数据结构。
+5. 注册`struct net_device_ops`数据结构；该数据结构包含各种函数指针，用于操作对应的网卡设备。
+6. 注册对应网卡设备的`ethtool`函数。
+
 **dma_set_mask_and_coherent**
 
-`dma_set_mask_and_coherent`函数设置`ixgbe`网卡的`DMA`属掩码和一致性属性。
+`dma_set_mask_and_coherent`函数设置`ixgbe`网卡的`DMA`掩码和一致性属性。
 
 **alloc_etherdev_mq**
 
@@ -404,41 +427,7 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_change_mtu		= ixgbe_change_mtu,
 	.ndo_tx_timeout		= ixgbe_tx_timeout,
 	.ndo_set_tx_maxrate	= ixgbe_tx_maxrate,
-	.ndo_vlan_rx_add_vid	= ixgbe_vlan_rx_add_vid,
-	.ndo_vlan_rx_kill_vid	= ixgbe_vlan_rx_kill_vid,
-	.ndo_do_ioctl		= ixgbe_ioctl,
-	.ndo_set_vf_mac		= ixgbe_ndo_set_vf_mac,
-	.ndo_set_vf_vlan	= ixgbe_ndo_set_vf_vlan,
-	.ndo_set_vf_rate	= ixgbe_ndo_set_vf_bw,
-	.ndo_set_vf_spoofchk	= ixgbe_ndo_set_vf_spoofchk,
-	.ndo_set_vf_rss_query_en = ixgbe_ndo_set_vf_rss_query_en,
-	.ndo_set_vf_trust	= ixgbe_ndo_set_vf_trust,
-	.ndo_get_vf_config	= ixgbe_ndo_get_vf_config,
-	.ndo_get_stats64	= ixgbe_get_stats64,
-	.ndo_setup_tc		= __ixgbe_setup_tc,
-#ifdef IXGBE_FCOE
-	.ndo_select_queue	= ixgbe_select_queue,
-	.ndo_fcoe_ddp_setup = ixgbe_fcoe_ddp_get,
-	.ndo_fcoe_ddp_target = ixgbe_fcoe_ddp_target,
-	.ndo_fcoe_ddp_done = ixgbe_fcoe_ddp_put,
-	.ndo_fcoe_enable = ixgbe_fcoe_enable,
-	.ndo_fcoe_disable = ixgbe_fcoe_disable,
-	.ndo_fcoe_get_wwn = ixgbe_fcoe_get_wwn,
-	.ndo_fcoe_get_hbainfo = ixgbe_fcoe_get_hbainfo,
-#endif /* IXGBE_FCOE */
-	.ndo_set_features = ixgbe_set_features,
-	.ndo_fix_features = ixgbe_fix_features,
-	.ndo_fdb_add		= ixgbe_ndo_fdb_add,
-	.ndo_bridge_setlink	= ixgbe_ndo_bridge_setlink,
-	.ndo_bridge_getlink	= ixgbe_ndo_bridge_getlink,
-	.ndo_dfwd_add_station	= ixgbe_fwd_add,
-	.ndo_dfwd_del_station	= ixgbe_fwd_del,
-	.ndo_udp_tunnel_add	= udp_tunnel_nic_add_port,
-	.ndo_udp_tunnel_del	= udp_tunnel_nic_del_port,
-	.ndo_features_check	= ixgbe_features_check,
-	.ndo_bpf		= ixgbe_xdp,
-	.ndo_xdp_xmit		= ixgbe_xdp_xmit,
-	.ndo_xsk_wakeup         = ixgbe_xsk_wakeup,
+	...
 };
 ```
 
@@ -464,41 +453,7 @@ static const struct ethtool_ops ixgbe_ethtool_ops = {
 	.get_wol                = ixgbe_get_wol,
 	.set_wol                = ixgbe_set_wol,
 	.nway_reset             = ixgbe_nway_reset,
-	.get_link               = ethtool_op_get_link,
-	.get_eeprom_len         = ixgbe_get_eeprom_len,
-	.get_eeprom             = ixgbe_get_eeprom,
-	.set_eeprom             = ixgbe_set_eeprom,
-	.get_ringparam          = ixgbe_get_ringparam,
-	.set_ringparam          = ixgbe_set_ringparam,
-	.get_pause_stats	= ixgbe_get_pause_stats,
-	.get_pauseparam         = ixgbe_get_pauseparam,
-	.set_pauseparam         = ixgbe_set_pauseparam,
-	.get_msglevel           = ixgbe_get_msglevel,
-	.set_msglevel           = ixgbe_set_msglevel,
-	.self_test              = ixgbe_diag_test,
-	.get_strings            = ixgbe_get_strings,
-	.set_phys_id            = ixgbe_set_phys_id,
-	.get_sset_count         = ixgbe_get_sset_count,
-	.get_ethtool_stats      = ixgbe_get_ethtool_stats,
-	.get_coalesce           = ixgbe_get_coalesce,
-	.set_coalesce           = ixgbe_set_coalesce,
-	.get_rxnfc		= ixgbe_get_rxnfc,
-	.set_rxnfc		= ixgbe_set_rxnfc,
-	.get_rxfh_indir_size	= ixgbe_rss_indir_size,
-	.get_rxfh_key_size	= ixgbe_get_rxfh_key_size,
-	.get_rxfh		= ixgbe_get_rxfh,
-	.set_rxfh		= ixgbe_set_rxfh,
-	.get_eee		= ixgbe_get_eee,
-	.set_eee		= ixgbe_set_eee,
-	.get_channels		= ixgbe_get_channels,
-	.set_channels		= ixgbe_set_channels,
-	.get_priv_flags		= ixgbe_get_priv_flags,
-	.set_priv_flags		= ixgbe_set_priv_flags,
-	.get_ts_info		= ixgbe_get_ts_info,
-	.get_module_info	= ixgbe_get_module_info,
-	.get_module_eeprom	= ixgbe_get_module_eeprom,
-	.get_link_ksettings     = ixgbe_get_link_ksettings,
-	.set_link_ksettings     = ixgbe_set_link_ksettings,
+	...
 };
 ```
 
@@ -510,11 +465,11 @@ static const struct ethtool_ops ixgbe_ethtool_ops = {
 
 **ixgbe_init_interrupt_scheme**
 
-此函数负责初始化`ixgbe`网卡的中断方案。对于网卡设备来说正确初始化中断是及其重要的。如下所示为`ixgbe_init_interrupt_scheme`函数的调用关系图：
+此函数负责初始化`ixgbe`网卡的中断方案。对于网卡设备来说正确初始化中断是及其重要的。`ixgbe_init_interrupt_scheme`先检查硬件是否支持`MSI-X`，然后调用`netif_napi_add`给每个中断设置`ixgbe_poll`回调。如下所示为`ixgbe_init_interrupt_scheme`函数的调用关系图：
 
 <img title="" src="ixgbe_init_interrupt_scheme.png" alt="kvm_ioctl.png" data-align="center">
 
-可以看到`ixgbe_init_interrupt_scheme`最终会调用到``函数：
+**`netif_napi_add`**函数：
 
 ```c
 /* initialize NAPI */
@@ -522,9 +477,9 @@ netif_napi_add(adapter->netdev, &q_vector->napi,
 		       ixgbe_poll, 64);
 ```
 
-`netif_napi_add`函数注册一个`NAPI`机制必须的函数。对于`ixgbe`网卡来说，这个函数是`ixgbe_poll`，用于轮询网卡接收队列，处理接收到的数据包。
+`netif_napi_add`函数注册一个`NAPI`机制必须的函数。对于`ixgbe`网卡来说，这个函数是**`ixgbe_poll`**，用于轮询网卡接收队列，处理接收到的数据包。
 
-### 启动网卡
+## 启动网卡
 
 上面的初始化流程都完成以后，就可以启动网卡了。在[`网卡驱动初始化`](#网卡驱动初始化)中注册了`ixgbe`网卡设备的操作函数，包含了网卡启用、发包、设置`MAC`地址等回调函数。
 
@@ -560,17 +515,24 @@ int ixgbe_open(struct net_device *netdev)
 	netif_carrier_off(netdev);
 
 	/* allocate transmit descriptors */
-    // 分配了RingBuffer，并建立内存和Tx队列的映射关系
+    // 同接收
 	err = ixgbe_setup_all_tx_resources(adapter);
     ...
-	/* allocate receive descriptors */
-    // 分配了RingBuffer，并建立内存和Rx队列的映射关系
+	/* allocate receive descriptors 
+     * 分配发送队列，每个队列申请自己的 DMA 地址，
+     * 总长度 sizeof(struct ixgbe_tx_buffer) * tx_ring->count, 
+     * 其中 count 就是大家常说的网卡队列 ring buffer 个数，默认 512，一般都要调大，防止丢包。
+     */
 	err = ixgbe_setup_all_rx_resources(adapter);
 	if (err)
 		goto err_setup_rx;
-
+	/* 设置网卡虚拟化，接收模式等，
+     * 调用 ixgbe_configure_tx, ixgbe_configure_rx配置硬件接收发送队列。
+     */
 	ixgbe_configure(adapter);
-    // 注册中断处理函数
+    /* 初始化中断
+     * 对于支持MSI-X的系统来说，最终调用ixgbe_request_msix_irqs
+     */
 	err = ixgbe_request_irq(adapter);
 	if (err)
 		goto err_req_irq;
@@ -615,7 +577,7 @@ static int ixgbe_setup_all_rx_resources(struct ixgbe_adapter *adapter)
 }
 ```
 
-上面的循环中，创建了若干个发送队列和接收队列。下图所示为接收队列，发送队列类似。
+上面的循环中，创建了若干个接收队列。下图所示为接收队列，发送队列类似。
 
 <img title="" src="tx_ringbuffer.png" alt="loading-ag-889" data-align="center">
 

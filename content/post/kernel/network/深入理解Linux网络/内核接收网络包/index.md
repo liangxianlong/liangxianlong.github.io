@@ -157,7 +157,7 @@ static int __init net_dev_init(void)
         struct work_struct *flush = per_cpu_ptr(&flush_works, i);
         // 为当前cpu创建softnet_data数据
         struct softnet_data *sd = &per_cpu(softnet_data, i);
-		...
+        ...
         // 注册poll_list
         INIT_LIST_HEAD(&sd->poll_list);
         sd->output_queue_tailp = &sd->output_queue;
@@ -221,26 +221,26 @@ struct softirq_action
 
 ```c
 struct proto tcp_prot = {
-	.name			= "TCP",
-	.owner			= THIS_MODULE,
-	.close			= tcp_close,
-	.pre_connect		= tcp_v4_pre_connect,
-	.connect		= tcp_v4_connect,
-	.disconnect		= tcp_disconnect,
-	.accept			= inet_csk_accept,
-	.ioctl			= tcp_ioctl,
-	.init			= tcp_v4_init_sock,
-	.destroy		= tcp_v4_destroy_sock,
-	.shutdown		= tcp_shutdown,
-	.setsockopt		= tcp_setsockopt,
-	.getsockopt		= tcp_getsockopt,
-	.bpf_bypass_getsockopt	= tcp_bpf_bypass_getsockopt,
-	.keepalive		= tcp_set_keepalive,
-	.recvmsg		= tcp_recvmsg,
-	.sendmsg		= tcp_sendmsg,
-	.sendpage		= tcp_sendpage,
-	.backlog_rcv		= tcp_v4_do_rcv,
-	.release_cb		= tcp_release_cb,
+    .name            = "TCP",
+    .owner            = THIS_MODULE,
+    .close            = tcp_close,
+    .pre_connect        = tcp_v4_pre_connect,
+    .connect        = tcp_v4_connect,
+    .disconnect        = tcp_disconnect,
+    .accept            = inet_csk_accept,
+    .ioctl            = tcp_ioctl,
+    .init            = tcp_v4_init_sock,
+    .destroy        = tcp_v4_destroy_sock,
+    .shutdown        = tcp_shutdown,
+    .setsockopt        = tcp_setsockopt,
+    .getsockopt        = tcp_getsockopt,
+    .bpf_bypass_getsockopt    = tcp_bpf_bypass_getsockopt,
+    .keepalive        = tcp_set_keepalive,
+    .recvmsg        = tcp_recvmsg,
+    .sendmsg        = tcp_sendmsg,
+    .sendpage        = tcp_sendpage,
+    .backlog_rcv        = tcp_v4_do_rcv,
+    .release_cb        = tcp_release_cb,
     ...
 };
 EXPORT_SYMBOL(tcp_prot);
@@ -251,14 +251,14 @@ EXPORT_SYMBOL(tcp_prot);
 ```c
 int inet_add_protocol(const struct net_protocol *prot, unsigned char protocol)
 {
-	if (!prot->netns_ok) {
-		pr_err("Protocol %u is not namespace aware, cannot register.\n",
-			protocol);
-		return -EINVAL;
-	}
+    if (!prot->netns_ok) {
+        pr_err("Protocol %u is not namespace aware, cannot register.\n",
+            protocol);
+        return -EINVAL;
+    }
 
-	return !cmpxchg((const struct net_protocol **)&inet_protos[protocol],
-			NULL, prot) ? 0 : -1;
+    return !cmpxchg((const struct net_protocol **)&inet_protos[protocol],
+            NULL, prot) ? 0 : -1;
 }
 ```
 
@@ -266,9 +266,9 @@ int inet_add_protocol(const struct net_protocol *prot, unsigned char protocol)
 
 ```c
 static struct packet_type ip_packet_type __read_mostly = {
-	.type = cpu_to_be16(ETH_P_IP),
-	.func = ip_rcv,
-	.list_func = ip_list_rcv,
+    .type = cpu_to_be16(ETH_P_IP),
+    .func = ip_rcv,
+    .list_func = ip_list_rcv,
 };
 ```
 
@@ -277,11 +277,11 @@ static struct packet_type ip_packet_type __read_mostly = {
 ```c
 void dev_add_pack(struct packet_type *pt)
 {
-	struct list_head *head = ptype_head(pt);
+    struct list_head *head = ptype_head(pt);
 
-	spin_lock(&ptype_lock);
-	list_add_rcu(&pt->list, head);
-	spin_unlock(&ptype_lock);
+    spin_lock(&ptype_lock);
+    list_add_rcu(&pt->list, head);
+    spin_unlock(&ptype_lock);
 }
 EXPORT_SYMBOL(dev_add_pack);
 ```
@@ -289,11 +289,11 @@ EXPORT_SYMBOL(dev_add_pack);
 ```c
 static inline struct list_head *ptype_head(const struct packet_type *pt)
 {
-	if (pt->type == htons(ETH_P_ALL))
-		return pt->dev ? &pt->dev->ptype_all : &ptype_all;
-	else
-		return pt->dev ? &pt->dev->ptype_specific :
-				 &ptype_base[ntohs(pt->type) & PTYPE_HASH_MASK];
+    if (pt->type == htons(ETH_P_ALL))
+        return pt->dev ? &pt->dev->ptype_all : &ptype_all;
+    else
+        return pt->dev ? &pt->dev->ptype_specific :
+                 &ptype_base[ntohs(pt->type) & PTYPE_HASH_MASK];
 }
 ```
 
@@ -306,8 +306,8 @@ static inline struct list_head *ptype_head(const struct packet_type *pt)
 ```c
 #ifdef MODULE
 /* Creates an alias so file2alias.c can find device table. */
-#define MODULE_DEVICE_TABLE(type, name)					\
-extern typeof(name) __mod_##type##__##name##_device_table		\
+#define MODULE_DEVICE_TABLE(type, name)                    \
+extern typeof(name) __mod_##type##__##name##_device_table        \
   __attribute__ ((unused, alias(__stringify(name))))
 #else  /* !MODULE */
 #define MODULE_DEVICE_TABLE(type, name)
@@ -326,21 +326,21 @@ extern typeof(name) __mod_##type##__##name##_device_table		\
  *   Class, Class Mask, private data (not used) }
  */
 static const struct pci_device_id ixgbe_pci_tbl[] = {
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_DUAL_PORT), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_SINGLE_PORT), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT2), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_CX4), board_82598 },
-	...
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_XF_LR), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_SFP_LOM), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_BX), board_82598 },
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_KX4), board_82599 },
-	...
-	/* required last entry */
-	{0, }
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_DUAL_PORT), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AF_SINGLE_PORT), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598AT2), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_CX4), board_82598 },
+    ...
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_XF_LR), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598EB_SFP_LOM), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82598_BX), board_82598 },
+    {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_KX4), board_82599 },
+    ...
+    /* required last entry */
+    {0, }
 };
 MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
 ```
@@ -349,14 +349,14 @@ MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
 
 ```c
 static struct pci_driver ixgbe_driver = {
-	.name      = ixgbe_driver_name,
-	.id_table  = ixgbe_pci_tbl,
-	.probe     = ixgbe_probe,
-	.remove    = ixgbe_remove,
-	.driver.pm = &ixgbe_pm_ops,
-	.shutdown  = ixgbe_shutdown,
-	.sriov_configure = ixgbe_pci_sriov_configure,
-	.err_handler = &ixgbe_err_handler
+    .name      = ixgbe_driver_name,
+    .id_table  = ixgbe_pci_tbl,
+    .probe     = ixgbe_probe,
+    .remove    = ixgbe_remove,
+    .driver.pm = &ixgbe_pm_ops,
+    .shutdown  = ixgbe_shutdown,
+    .sriov_configure = ixgbe_pci_sriov_configure,
+    .err_handler = &ixgbe_err_handler
 };
 ```
 
@@ -371,17 +371,17 @@ static struct pci_driver ixgbe_driver = {
  **/
 static int __init ixgbe_init_module(void)
 {
-	int ret;
-	...
-	ixgbe_wq = create_singlethread_workqueue(ixgbe_driver_name);
-	...
-	ret = pci_register_driver(&ixgbe_driver);
+    int ret;
+    ...
+    ixgbe_wq = create_singlethread_workqueue(ixgbe_driver_name);
+    ...
+    ret = pci_register_driver(&ixgbe_driver);
     ...
 #ifdef CONFIG_IXGBE_DCA
-	dca_register_notify(&dca_notifier);
+    dca_register_notify(&dca_notifier);
 #endif
 
-	return 0;
+    return 0;
 }
 
 module_init(ixgbe_init_module);
@@ -418,16 +418,16 @@ module_init(ixgbe_init_module);
 
 ```c
 static const struct net_device_ops ixgbe_netdev_ops = {
-	.ndo_open		= ixgbe_open,
-	.ndo_stop		= ixgbe_close,
-	.ndo_start_xmit		= ixgbe_xmit_frame,
-	.ndo_set_rx_mode	= ixgbe_set_rx_mode,
-	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_set_mac_address	= ixgbe_set_mac,
-	.ndo_change_mtu		= ixgbe_change_mtu,
-	.ndo_tx_timeout		= ixgbe_tx_timeout,
-	.ndo_set_tx_maxrate	= ixgbe_tx_maxrate,
-	...
+    .ndo_open        = ixgbe_open,
+    .ndo_stop        = ixgbe_close,
+    .ndo_start_xmit        = ixgbe_xmit_frame,
+    .ndo_set_rx_mode    = ixgbe_set_rx_mode,
+    .ndo_validate_addr    = eth_validate_addr,
+    .ndo_set_mac_address    = ixgbe_set_mac,
+    .ndo_change_mtu        = ixgbe_change_mtu,
+    .ndo_tx_timeout        = ixgbe_tx_timeout,
+    .ndo_set_tx_maxrate    = ixgbe_tx_maxrate,
+    ...
 };
 ```
 
@@ -438,7 +438,7 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 ```c
 void ixgbe_set_ethtool_ops(struct net_device *netdev)
 {
-	netdev->ethtool_ops = &ixgbe_ethtool_ops;
+    netdev->ethtool_ops = &ixgbe_ethtool_ops;
 }
 ```
 
@@ -446,14 +446,14 @@ void ixgbe_set_ethtool_ops(struct net_device *netdev)
 
 ```c
 static const struct ethtool_ops ixgbe_ethtool_ops = {
-	.supported_coalesce_params = ETHTOOL_COALESCE_USECS,
-	.get_drvinfo            = ixgbe_get_drvinfo,
-	.get_regs_len           = ixgbe_get_regs_len,
-	.get_regs               = ixgbe_get_regs,
-	.get_wol                = ixgbe_get_wol,
-	.set_wol                = ixgbe_set_wol,
-	.nway_reset             = ixgbe_nway_reset,
-	...
+    .supported_coalesce_params = ETHTOOL_COALESCE_USECS,
+    .get_drvinfo            = ixgbe_get_drvinfo,
+    .get_regs_len           = ixgbe_get_regs_len,
+    .get_regs               = ixgbe_get_regs,
+    .get_wol                = ixgbe_get_wol,
+    .set_wol                = ixgbe_set_wol,
+    .nway_reset             = ixgbe_nway_reset,
+    ...
 };
 ```
 
@@ -469,15 +469,15 @@ static const struct ethtool_ops ixgbe_ethtool_ops = {
 
 <img title="" src="ixgbe_init_interrupt_scheme.png" alt="kvm_ioctl.png" data-align="center">
 
-**`netif_napi_add`**函数：
+**netif_napi_add**函数：
 
 ```c
 /* initialize NAPI */
 netif_napi_add(adapter->netdev, &q_vector->napi,
-		       ixgbe_poll, 64);
+               ixgbe_poll, 64);
 ```
 
-`netif_napi_add`函数注册一个`NAPI`机制必须的函数。对于`ixgbe`网卡来说，这个函数是**`ixgbe_poll`**，用于轮询网卡接收队列，处理接收到的数据包。
+`netif_napi_add`函数注册一个`NAPI`机制必须的函数。对于`ixgbe`网卡来说，这个函数是**ixgbe_poll**，用于轮询网卡接收队列，处理接收到的数据包。
 
 ## 启动网卡
 
@@ -485,11 +485,11 @@ netif_napi_add(adapter->netdev, &q_vector->napi,
 
 ```c
 static const struct net_device_ops ixgbe_netdev_ops = {
-    .ndo_open		= ixgbe_open,
-	.ndo_stop		= ixgbe_close,
-	.ndo_start_xmit		= ixgbe_xmit_frame,
-	.ndo_set_rx_mode	= ixgbe_set_rx_mode,
-	.ndo_validate_addr	= eth_validate_addr,
+    .ndo_open        = ixgbe_open,
+    .ndo_stop        = ixgbe_close,
+    .ndo_start_xmit        = ixgbe_xmit_frame,
+    .ndo_set_rx_mode    = ixgbe_set_rx_mode,
+    .ndo_validate_addr    = eth_validate_addr,
     ...
 }
 ```
@@ -512,40 +512,40 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 int ixgbe_open(struct net_device *netdev)
 {
     ...
-	netif_carrier_off(netdev);
+    netif_carrier_off(netdev);
 
-	/* allocate transmit descriptors */
+    /* allocate transmit descriptors */
     // 同接收
-	err = ixgbe_setup_all_tx_resources(adapter);
+    err = ixgbe_setup_all_tx_resources(adapter);
     ...
-	/* allocate receive descriptors 
+    /* allocate receive descriptors 
      * 分配发送队列，每个队列申请自己的 DMA 地址，
      * 总长度 sizeof(struct ixgbe_tx_buffer) * tx_ring->count, 
      * 其中 count 就是大家常说的网卡队列 ring buffer 个数，默认 512，一般都要调大，防止丢包。
      */
-	err = ixgbe_setup_all_rx_resources(adapter);
-	if (err)
-		goto err_setup_rx;
-	/* 设置网卡虚拟化，接收模式等，
+    err = ixgbe_setup_all_rx_resources(adapter);
+    if (err)
+        goto err_setup_rx;
+    /* 设置网卡虚拟化，接收模式等，
      * 调用 ixgbe_configure_tx, ixgbe_configure_rx配置硬件接收发送队列。
      */
-	ixgbe_configure(adapter);
+    ixgbe_configure(adapter);
     /* 初始化中断
      * 对于支持MSI-X的系统来说，最终调用ixgbe_request_msix_irqs
      */
-	err = ixgbe_request_irq(adapter);
-	if (err)
-		goto err_req_irq;
+    err = ixgbe_request_irq(adapter);
+    if (err)
+        goto err_req_irq;
 
-	/* Notify the stack of the actual queue counts. */
-	queues = adapter->num_tx_queues;
-	err = netif_set_real_num_tx_queues(netdev, queues);
+    /* Notify the stack of the actual queue counts. */
+    queues = adapter->num_tx_queues;
+    err = netif_set_real_num_tx_queues(netdev, queues);
     ...
-	queues = adapter->num_rx_queues;
-	err = netif_set_real_num_rx_queues(netdev, queues);
+    queues = adapter->num_rx_queues;
+    err = netif_set_real_num_rx_queues(netdev, queues);
     ...
     // ixgbe_up_complete->ixgbe_napi_enable_all->napi_enable启用NAPI
-	ixgbe_up_complete(adapter);
+    ixgbe_up_complete(adapter);
     ...
 }
 ```
@@ -567,12 +567,12 @@ int ixgbe_open(struct net_device *netdev)
  **/
 static int ixgbe_setup_all_rx_resources(struct ixgbe_adapter *adapter)
 {
-	int i, err = 0;
+    int i, err = 0;
 
-	for (i = 0; i < adapter->num_rx_queues; i++) {
-		err = ixgbe_setup_rx_resources(adapter, adapter->rx_ring[i]);
-		...
-	}
+    for (i = 0; i < adapter->num_rx_queues; i++) {
+        err = ixgbe_setup_rx_resources(adapter, adapter->rx_ring[i]);
+        ...
+    }
     ...
 }
 ```
@@ -592,30 +592,30 @@ static int ixgbe_setup_all_rx_resources(struct ixgbe_adapter *adapter)
  * Returns 0 on success, negative on failure
  **/
 int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
-			     struct ixgbe_ring *rx_ring)
+                 struct ixgbe_ring *rx_ring)
 {
-	...
+    ...
     // ixgbe_rx_buffer的size
-	size = sizeof(struct ixgbe_rx_buffer) * rx_ring->count;
+    size = sizeof(struct ixgbe_rx_buffer) * rx_ring->count;
 
-	if (rx_ring->q_vector)
-		ring_node = rx_ring->q_vector->numa_node;
+    if (rx_ring->q_vector)
+        ring_node = rx_ring->q_vector->numa_node;
     // 分配ixgbe_rx_buffer队列内存
-	rx_ring->rx_buffer_info = vmalloc_node(size, ring_node);
-	...
-	/* Round up to nearest 4K */
+    rx_ring->rx_buffer_info = vmalloc_node(size, ring_node);
+    ...
+    /* Round up to nearest 4K */
     // 分配ixgbe_adv_rx_desc队列内存
-	rx_ring->size = rx_ring->count * sizeof(union ixgbe_adv_rx_desc);
-	rx_ring->size = ALIGN(rx_ring->size, 4096);
-	set_dev_node(dev, ring_node);
-	rx_ring->desc = dma_alloc_coherent(dev,
-					   rx_ring->size,
-					   &rx_ring->dma,
-					   GFP_KERNEL);
-	...
+    rx_ring->size = rx_ring->count * sizeof(union ixgbe_adv_rx_desc);
+    rx_ring->size = ALIGN(rx_ring->size, 4096);
+    set_dev_node(dev, ring_node);
+    rx_ring->desc = dma_alloc_coherent(dev,
+                       rx_ring->size,
+                       &rx_ring->dma,
+                       GFP_KERNEL);
+    ...
     // 初始化队列成员
-	rx_ring->next_to_clean = 0;
-	rx_ring->next_to_use = 0;
+    rx_ring->next_to_clean = 0;
+    rx_ring->next_to_use = 0;
     ...
 }
 ```
@@ -642,18 +642,35 @@ int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
  **/
 static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
 {
-	...
-	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED)
-		err = ixgbe_request_msix_irqs(adapter);
-	else if (adapter->flags & IXGBE_FLAG_MSI_ENABLED)
-		err = request_irq(adapter->pdev->irq, ixgbe_intr, 0,
-				  netdev->name, adapter);
-	else
-		err = request_irq(adapter->pdev->irq, ixgbe_intr, IRQF_SHARED,
-				  netdev->name, adapter);
+    ...
+    if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED)
+        // 若网卡设备支持MSI-X中断则初始化MSI-X中断
+        err = ixgbe_request_msix_irqs(adapter);
+    else if (adapter->flags & IXGBE_FLAG_MSI_ENABLED)
+        // 若网卡设备支持MSI中断则初始化MSI中断并注册ixgbe_intr中断函数
+        err = request_irq(adapter->pdev->irq, ixgbe_intr, 0,
+                  netdev->name, adapter);
+    else
+        // 若网卡设备只支持传统的中断，注册ixgbe_intr中断函数
+        err = request_irq(adapter->pdev->irq, ixgbe_intr, IRQF_SHARED,
+                  netdev->name, adapter);
     ...
 }
 ```
+
+可以使用`lspci`命令查看对应网卡是否支持`MSI-X`中断:
+
+```bash
+# root @ caesar-PC in ~ [22:34:19] 
+$ lspci -vvv | grep "ixgbe" -A 50
+...
+Capabilities: [80] MSI-X: Enable+ Count=16 Masked-
+                Vector table: BAR=0 offset=00002000
+                PBA: BAR=0 offset=00003000
+...
+```
+
+如果输出中有`MSI-X`字段且带有`Enable+`说明此网卡设备是支持`MSI-X`中断的，
 
 ## 数据包到达
 

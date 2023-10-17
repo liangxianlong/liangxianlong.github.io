@@ -663,14 +663,30 @@ static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
 ```bash
 # root @ caesar-PC in ~ [22:34:19] 
 $ lspci -vvv | grep "ixgbe" -A 50
+61:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network
 ...
-Capabilities: [80] MSI-X: Enable+ Count=16 Masked-
-                Vector table: BAR=0 offset=00002000
-                PBA: BAR=0 offset=00003000
+    Interrupt: pin A routed to IRQ 97
+...
+    Capabilities: [70] MSI-X: Enable+ Count=64 Masked-
+            Vector table: BAR=4 offset=00000000
+            PBA: BAR=4 offset=00002000
+...
+    Capabilities: [160 v1] Single Root I/O Virtualization (SR-IOV)
+        ...
+        Initial VFs: 64, Total VFs: 64, Number of VFs: 0, Function Dependency Link: 00
+        ...
+    Kernel driver in use: ixgbe
+    Kernel modules: ixgbe
 ...
 ```
 
-如果输出中有`MSI-X`字段且带有`Enable+`说明此网卡设备是支持`MSI-X`中断的，
+从上述输出中可以观察到一些关键信息:
+
+1. 硬件中断：`IRQ 97`，支持`MSI-X(Capabilities: [70] MSI-X: Enable+)`。
+
+2. 当前使用的网卡驱动为`ixgbe`，对应的内核模块是`ixgbe`。
+
+3. 支持`sriov`。
 
 ## 数据包到达
 

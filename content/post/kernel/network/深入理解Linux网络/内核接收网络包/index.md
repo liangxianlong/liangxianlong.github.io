@@ -688,6 +688,47 @@ $ lspci -vvv | grep "ixgbe" -A 50
 
 3. 支持`sriov`。
 
+### `ixgbe_request_msix_irqs`
+
+`ixgbe_request_msix_irqs`简要版实现如下：
+
+```c
+/**
+ * ixgbe_request_msix_irqs - Initialize MSI-X interrupts
+ * @adapter: board private structure
+ *
+ * ixgbe_request_msix_irqs allocates MSI-X vectors and requests
+ * interrupts from the kernel.
+ **/
+static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
+{
+	...
+	for (vector = 0; vector < adapter->num_q_vectors; vector++) {
+		struct ixgbe_q_vector *q_vector = adapter->q_vector[vector];
+		struct msix_entry *entry = &adapter->msix_entries[vector];
+        ...
+        // 为每一个vector注册硬中断处理函数ixgbe_msix_clean_rings
+		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
+				  q_vector->name, q_vector);
+		...
+        /* If Flow Director is enabled, set interrupt affinity */
+		if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE) {
+			/* assign the mask for this irq */
+            // 不同的中断向量可以由不同的CPU进行处理
+			irq_set_affinity_hint(entry->vector,
+					      &q_vector->affinity_mask);
+		}
+	}
+    ...
+	err = request_irq(adapter->msix_entries[vector].vector,
+			  ixgbe_msix_other, 0, netdev->name, adapter);
+	...
+	return 0;
+}
+```
+
+
+
 ## 数据包到达
 
 ### 硬中断处理

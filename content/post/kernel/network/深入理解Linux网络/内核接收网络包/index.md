@@ -702,32 +702,52 @@ $ lspci -vvv | grep "ixgbe" -A 50
  **/
 static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 {
-	...
-	for (vector = 0; vector < adapter->num_q_vectors; vector++) {
-		struct ixgbe_q_vector *q_vector = adapter->q_vector[vector];
-		struct msix_entry *entry = &adapter->msix_entries[vector];
+    ...
+    for (vector = 0; vector < adapter->num_q_vectors; vector++) {
+        struct ixgbe_q_vector *q_vector = adapter->q_vector[vector];
+        struct msix_entry *entry = &adapter->msix_entries[vector];
         ...
         // 为每一个vector注册硬中断处理函数ixgbe_msix_clean_rings
-		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
-				  q_vector->name, q_vector);
-		...
+        err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
+                  q_vector->name, q_vector);
+        ...
         /* If Flow Director is enabled, set interrupt affinity */
-		if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE) {
-			/* assign the mask for this irq */
+        if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE) {
+            /* assign the mask for this irq */
             // 不同的中断向量可以由不同的CPU进行处理
-			irq_set_affinity_hint(entry->vector,
-					      &q_vector->affinity_mask);
-		}
-	}
+            irq_set_affinity_hint(entry->vector,
+                          &q_vector->affinity_mask);
+        }
+    }
     ...
-	err = request_irq(adapter->msix_entries[vector].vector,
-			  ixgbe_msix_other, 0, netdev->name, adapter);
-	...
-	return 0;
+    err = request_irq(adapter->msix_entries[vector].vector,
+              ixgbe_msix_other, 0, netdev->name, adapter);
+    ...
+    return 0;
 }
 ```
 
+从上述代码中可以看到，在`MSI-X`的情况下为每个`RX`队列注册了硬中断回调函数`ixgbe_msix_clean_rings`，因此从网卡硬件中断的层面就可以设置让收到的包被不同的`CPU`处理。如下所示为`ixgbe_request_msix_irqs`的调用关系:
 
+<img title="" src="Calls-ixgbe_request_msix_irqs.png" alt="" data-align="center" width="789">
+
+`ixgbe_request_msix_irqs`最终会调用到`____napi_schedule`:
+
+```c
+/* Called with irq disabled */
+static inline void ____napi_schedule(struct softnet_data *sd,
+				     struct napi_struct *napi)
+{
+	list_add_tail(&napi->poll_list, &sd->poll_list);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+}
+```
+
+`____napi_schedule`主要干了两件事情:
+
+1. 将硬中断函数传过来的`struct napi_struct`加入到当前`CPU struct softnet_data`数据结构的`poll_list`成员上。
+
+2. `__raise_softirq_irqoff`触发一个`NET_RX_SOFTIRQ`软中断，这将触发执行网络子系统初始化时注册的`net_rx_action`，参考[网络子系统初始化](#网络子系统初始化)中`open_softirq(NET_RX_SOFTIRQ, net_rx_action)`。
 
 ## 数据包到达
 

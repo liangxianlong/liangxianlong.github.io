@@ -77,8 +77,8 @@ early_initcall(spawn_ksoftirqd);
 ```c
 static struct smp_hotplug_thread softirq_threads = {
     .store            = &ksoftirqd,
-    .thread_should_run    = ksoftirqd_should_run,
-    .thread_fn        = run_ksoftirqd,
+    .thread_should_run    = ksoftirqd_should_run,    // 调度到该线程时，判断能否执行
+    .thread_fn        = run_ksoftirqd,               // 调度到该线程时，执行的回调函数
     .thread_comm        = "ksoftirqd/%u",
 };
 ```
@@ -738,10 +738,10 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 ```c
 /* Called with irq disabled */
 static inline void ____napi_schedule(struct softnet_data *sd,
-				     struct napi_struct *napi)
+                     struct napi_struct *napi)
 {
-	list_add_tail(&napi->poll_list, &sd->poll_list);
-	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+    list_add_tail(&napi->poll_list, &sd->poll_list);
+    __raise_softirq_irqoff(NET_RX_SOFTIRQ);
 }
 ```
 
@@ -752,3 +752,36 @@ static inline void ____napi_schedule(struct softnet_data *sd,
 - `__raise_softirq_irqoff`触发一个`NET_RX_SOFTIRQ`软中断，这将触发执行网络子系统初始化时注册的`net_rx_action`，参考[网络子系统初始化](#网络子系统初始化)中`open_softirq(NET_RX_SOFTIRQ, net_rx_action)`。
 
 驱动的硬中断处理函数做的事情很少，大部分工作由软中断完成。此外，软中断会和硬中断在相同的`CPU`上运行。
+
+## 软中断处理
+
+在[创建ksoftirqd内核线程](#创建ksoftirqd内核线程)提到`ksoftirqd`线程由`smpboot_register_percpu_thread`创建，其最终会调用`kthread_create_on_cpu`为每一个`CPU`注册一个`smpboot_thread_fn`函数:
+
+```c
+smpboot_thread_fn
+  |-struct smpboot_thread_data *td = data;
+  |-struct smp_hotplug_thread *ht = td->ht;
+  |-while (1) {
+      set_current_state(TASK_INTERRUPTIBLE); // 设置当前 CPU 为可中断状态
+      ...
+      if !ht->thread_should_run(td->cpu) {   // 无 pending 的软中断
+          preempt_enable_no_resched();
+          schedule();
+      } else {                               // 有 pending 的软中断
+          __set_current_state(TASK_RUNNING);
+          preempt_enable();
+          ht->thread_fn(td->cpu);        // 如果此时执行的是 ksoftirqd 线程，
+            |-run_ksoftirqd              // 执行 run_ksoftirqd() 回调函数
+                |-local_irq_disable();   // 关闭所在 CPU 的所有硬中断
+                |
+                |-if local_softirq_pending() {
+                |    __do_softirq();
+                |    local_irq_enable();      // 重新打开所在 CPU 的所有硬中断
+                |    cond_resched();          // 将 CPU 交还给调度器
+                |    return;
+                |-}
+                |
+                |-local_irq_enable();         // 重新打开所在 CPU 的所有硬中断
+      }
+    }
+```

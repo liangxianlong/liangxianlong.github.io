@@ -731,7 +731,9 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 
 <img title="" src="Calls-ixgbe_request_msix_irqs.png" alt="" data-align="center" width="789">
 
-`ixgbe_request_msix_irqs`最终会调用到`____napi_schedule`:
+## 硬中断处理
+
+数据报文从网线到达网卡上的时候，首先到达网卡的接收队列。网卡会在之前分配的`rx_ring_buffer`中寻找可用的内存，找到后直接将数据报文`DMA`到网卡之前关联的内存里。`DMA`操作完成后，网卡会向`CPU`发起一个硬中断，通知`CPU`有数据到达。根据上文所述，`CPU`收到`MSI-X`中断时会调用`ixgbe`网卡主驱动注册的中断处理函数`ixgbe_request_msix_irqs`，最终会调用到`____napi_schedule`:
 
 ```c
 /* Called with irq disabled */
@@ -745,12 +747,8 @@ static inline void ____napi_schedule(struct softnet_data *sd,
 
 `____napi_schedule`主要干了两件事情:
 
-1. 将硬中断函数传过来的`struct napi_struct`加入到当前`CPU struct softnet_data`数据结构的`poll_list`成员上。
+- 将硬中断函数传过来的`struct napi_struct`加入到当前`CPU struct softnet_data`数据结构的`poll_list`成员上。
 
-2. `__raise_softirq_irqoff`触发一个`NET_RX_SOFTIRQ`软中断，这将触发执行网络子系统初始化时注册的`net_rx_action`，参考[网络子系统初始化](#网络子系统初始化)中`open_softirq(NET_RX_SOFTIRQ, net_rx_action)`。
+- `__raise_softirq_irqoff`触发一个`NET_RX_SOFTIRQ`软中断，这将触发执行网络子系统初始化时注册的`net_rx_action`，参考[网络子系统初始化](#网络子系统初始化)中`open_softirq(NET_RX_SOFTIRQ, net_rx_action)`。
 
-## 数据包到达
-
-### 硬中断处理
-
-数据报文从网线到达网卡上的时候，首先到达网卡的接收队列。网卡会在之前分配的`rx_ring_buffer`中寻找可用的内存，找到后直接将数据报文`DMA`到网卡之前关联的内存里。`DMA`操作完成后，网卡会向`CPU`发起一个硬中断，通知`CPU`有数据到达。中断的处理流程如下：
+驱动的硬中断处理函数做的事情很少，大部分工作由软中断完成。此外，软中断会和硬中断在相同的`CPU`上运行。

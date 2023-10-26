@@ -662,7 +662,7 @@ static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
 
 ```bash
 # root @ caesar-PC in ~ [22:34:19] 
-$ lspci -vvv | grep "ixgbe" -A 50
+$ lspci -vvv | grep "Intel Corporation 82599ES 10-Gigabit" -A 50
 61:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network
 ...
     Interrupt: pin A routed to IRQ 97
@@ -687,8 +687,6 @@ $ lspci -vvv | grep "ixgbe" -A 50
 2. 当前使用的网卡驱动为`ixgbe`，对应的内核模块是`ixgbe`。
 
 3. 支持`sriov`。
-
-### `ixgbe_request_msix_irqs`
 
 `ixgbe_request_msix_irqs`简要版实现如下：
 
@@ -785,3 +783,61 @@ smpboot_thread_fn
       }
     }
 ```
+
+### __do_softirq
+
+如果此时调度到的是`ksoftirqd`线程，并且有`pending`的软中断等待处理，那么`thread_fn`执行的就是`run_ksoftirqd`:
+
+```c
+static void run_ksoftirqd(unsigned int cpu)
+{
+	local_irq_disable(); // 关闭所在CPU的所有硬中断
+	if (local_softirq_pending()) {
+		/*
+		 * We can safely run softirq on inline stack, as we are not deep
+		 * in the task stack here.
+		 */
+		__do_softirq();// 处理pending的softirq
+		local_irq_enable();//重新打开所在CPU的硬中断
+		cond_resched();
+		return;
+	}
+	local_irq_enable();
+}
+```
+
+首先调用`local_irq_disable`关闭所在`CPU`的所有硬中断；然后判断是否有`pending softirq`，有就执行`__do_softirq`处理软中断，接下来重新打开打开所在`CPU`的硬中断并主动放弃`CPU`的使用权，以便其他任务能够运行。若没有待处理的`pending softirq`，则直接打开所在`CPU`的硬中断。`__do_softirq`会调用注册的`net_rx_action`:
+
+```c
+asmlinkage __visible void __softirq_entry __do_softirq(void)
+{
+    unsigned long end = jiffies + MAX_SOFTIRQ_TIME; // 轮询最长时间
+    ...
+    int max_restart = MAX_SOFTIRQ_RESTART;// 轮询的最大次数
+    ...
+    pending = local_softirq_pending(); // 获取pending的softirq数量
+    ...
+restart:
+    ...
+    while ((softirq_bit = ffs(pending))) {
+        ...
+        // 若是NET_RX_SOFTIRQ则指向net_rx_action
+        h->action(h);
+        ...
+    }
+    ...
+    // 再次获取 pending softirq 的数量
+    pending = local_softirq_pending();
+    if (pending) {
+        if (time_before(jiffies, end) && !need_resched() && --max_restart)
+            goto restart;
+
+        wakeup_softirqd();
+    }
+    ...
+}
+```
+
+### net_rx_action
+
+一旦软中断代码判断有`NET_RX_SOFTIRQ`处于`pending`状态，就会调用**net_rx_action**从`ring buffer`收包。

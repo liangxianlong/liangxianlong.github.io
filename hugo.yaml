@@ -230,6 +230,7 @@ markup:
         guessSyntax: true
         lineNoStart: 1
         lineNos: true
-        lineNumbersInTable: true
+        lineNumbersInTable: false
         tabWidth: 4
         style: perldoc
+

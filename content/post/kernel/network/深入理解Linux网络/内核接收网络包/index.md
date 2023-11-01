@@ -351,7 +351,7 @@ MODULE_DEVICE_TABLE(pci, ixgbe_pci_tbl);
 static struct pci_driver ixgbe_driver = {
     .name      = ixgbe_driver_name,
     .id_table  = ixgbe_pci_tbl,
-    .probe     = ixgbe_probe,
+    .probe     = ixgbe_probe,  //  系统探测到ixgbe网卡后调用ixgbe_probe
     .remove    = ixgbe_remove,
     .driver.pm = &ixgbe_pm_ops,
     .shutdown  = ixgbe_shutdown,
@@ -375,6 +375,7 @@ static int __init ixgbe_init_module(void)
     ...
     ixgbe_wq = create_singlethread_workqueue(ixgbe_driver_name);
     ...
+    // 注册ixgbe_driver
     ret = pci_register_driver(&ixgbe_driver);
     ...
 #ifdef CONFIG_IXGBE_DCA
@@ -387,7 +388,58 @@ static int __init ixgbe_init_module(void)
 module_init(ixgbe_init_module);
 ```
 
-`ixgbe_init_module`调用`pci_register_driver(&ixgbe_driver)`后，内核就知道`ixgbe`网卡驱动的`ixgbe_driver_name`和`ixgbe_probe`等函数地址以及其他一些驱动信息。网卡驱动被识别后，内核会调用其`probe`方法(`ixgbe_probe`)让网卡设备处于就绪状态。对于`ixgbe`网卡，其`ixgbe_probe`位于`drivers/net/ethernet/intel/ixgbe/ixgbe_main.c`。加载`ixgbe`网卡驱动时函数`ixgbe_probe`主要操作如下所示：
+`ixgbe_init_module`调用`pci_register_driver(&ixgbe_driver)`后，内核就知道`ixgbe`网卡驱动的`ixgbe_driver_name`和`ixgbe_probe`等函数地址以及其他一些驱动信息。网卡驱动被识别后，内核会调用其`probe`方法(`ixgbe_probe`)让网卡设备处于就绪状态。对于`ixgbe`网卡，其`ixgbe_probe`位于`drivers/net/ethernet/intel/ixgbe/ixgbe_main.c`:
+
+```c
+/**
+ * ixgbe_probe - Device Initialization Routine
+ * @pdev: PCI device information struct
+ * @ent: entry in ixgbe_pci_tbl
+ *
+ * Returns 0 on success, negative on failure
+ *
+ * ixgbe_probe initializes an adapter identified by a pci_dev structure.
+ * The OS initialization, configuring of the adapter private structure,
+ * and a hardware reset occur.
+ **/
+static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+{    
+    ...
+    // ent此处为ixgbe_pci_tbl变量，本质上就是根据ixgbe网卡型号选择ixgbe_info
+    const struct ixgbe_info *ii = ixgbe_info_tbl[ent->driver_data];
+    ...
+    /*
+     * pci_enable_device_mem()最终调用pci_write_config_word()
+     * 向配置寄存器Command（0x04）中写入PCI_COMMAND_MEMORY（0x2），
+     * 允许网卡驱动访问网卡的Memory空间
+     */
+    err = pci_enable_device_mem(pdev);
+    ...
+    // 向配置寄存器Command（0x04）中写入PCI_COMMAND_MASTER（0x4），
+    // 允许网卡申请PCI总线控制权
+    pci_set_master(pdev);
+    // 保存配置空间
+    pci_save_state(pdev);
+    ...
+    // 分配net_device和ixgbe_adapter
+    netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
+    ...
+    adapter = netdev_priv(netdev); // 得到ixgbe_adapter的指针
+    ...
+    hw = &adapter->hw; // 得到ixgbe_hw的指针
+    ...
+    // 将BAR0中的总线地址映射成内存地址，赋给hw->hw_addr，
+    // 允许网卡驱动通过hw->hw_addr访问网卡的BAR0对应的Memory空间
+    hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
+			      pci_resource_len(pdev, 0));
+	adapter->io_addr = hw->hw_addr;
+    ...
+    // 注册ixgbe_netdev_ops
+    netdev->netdev_ops = &ixgbe_netdev_ops;
+}
+```
+
+加载`ixgbe`网卡驱动时函数`ixgbe_probe`主要操作如下所示：
 
 <img title="" src="nic_init.png" alt="kvm_ioctl.png" data-align="center">
 
@@ -791,18 +843,18 @@ smpboot_thread_fn
 ```c
 static void run_ksoftirqd(unsigned int cpu)
 {
-	local_irq_disable(); // 关闭所在CPU的所有硬中断
-	if (local_softirq_pending()) {
-		/*
-		 * We can safely run softirq on inline stack, as we are not deep
-		 * in the task stack here.
-		 */
-		__do_softirq();// 处理pending的softirq
-		local_irq_enable();//重新打开所在CPU的硬中断
-		cond_resched();
-		return;
-	}
-	local_irq_enable();
+    local_irq_disable(); // 关闭所在CPU的所有硬中断
+    if (local_softirq_pending()) {
+        /*
+         * We can safely run softirq on inline stack, as we are not deep
+         * in the task stack here.
+         */
+        __do_softirq();// 处理pending的softirq
+        local_irq_enable();//重新打开所在CPU的硬中断
+        cond_resched();
+        return;
+    }
+    local_irq_enable();
 }
 ```
 
@@ -846,52 +898,52 @@ restart:
 static __latent_entropy void net_rx_action(struct softirq_action *h)
 {
     // 获取当前CPU的 per cpu变量softnet_data
-	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
+    struct softnet_data *sd = this_cpu_ptr(&softnet_data);
     // netdev_budget_usecs = 2 * USEC_PER_SEC / HZ;
     // USEC_PER_SEC: 1000000L
     // HZ: CONFIG_HZ
     // 一般情况下系统上CONFIG_HZ：1000
     // cat /proc/sys/net/core/netdev_budget_usecs
-	unsigned long time_limit = jiffies +
-		usecs_to_jiffies(READ_ONCE(netdev_budget_usecs));
+    unsigned long time_limit = jiffies +
+        usecs_to_jiffies(READ_ONCE(netdev_budget_usecs));
     // int netdev_budget __read_mostly = 300;
     // cat /proc/sys/net/core/netdev_budget
-	int budget = READ_ONCE(netdev_budget);
-	LIST_HEAD(list);
-	LIST_HEAD(repoll);
+    int budget = READ_ONCE(netdev_budget);
+    LIST_HEAD(list);
+    LIST_HEAD(repoll);
     ...
     list_splice_init(&sd->poll_list, &list);
     ...
     // 遍历sd->poll_list，执行ixgbe_poll函数
-	for (;;) {
+    for (;;) {
         if list_empty(&list) {
             ...
             break;
         }
-		struct napi_struct *n;
-		...
-		n = list_first_entry(&list, struct napi_struct, poll_list);
+        struct napi_struct *n;
+        ...
+        n = list_first_entry(&list, struct napi_struct, poll_list);
         // 调用napi_poll执行n->poll，对于ixgbe网卡来说其实最终调用的是ixgbe_poll
         // 并返回处理的数据帧数量，函数返回时，被处理的数据帧都已经发送到上层协议栈处理了
-		budget -= napi_poll(n, &repoll);
+        budget -= napi_poll(n, &repoll);
 
-		/* If softirq window is exhausted then punt.
-		 * Allow this to run for 2 jiffies since which will allow
-		 * an average latency of 1.5/HZ.
-		 */
+        /* If softirq window is exhausted then punt.
+         * Allow this to run for 2 jiffies since which will allow
+         * an average latency of 1.5/HZ.
+         */
         // 若budget或者time_limit使用完了，则退出数据帧处理流程
-		if (unlikely(budget <= 0 ||
-			     time_after_eq(jiffies, time_limit))) {
-			sd->time_squeeze++;
-			break;
-		}
-	}
-	...
+        if (unlikely(budget <= 0 ||
+                 time_after_eq(jiffies, time_limit))) {
+            sd->time_squeeze++;
+            break;
+        }
+    }
+    ...
     // 在给定的time_limit/budget内，没有能够处理完全部 napi
     // 关闭 NET_RX_SOFTIRQ 类型软中断，将 CPU 让给其他任务用，
     // 主动让出 CPU，不要让这种 softirq 独占 CPU 太久。
-	if (!list_empty(&sd->poll_list))
-		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+    if (!list_empty(&sd->poll_list))
+        __raise_softirq_irqoff(NET_RX_SOFTIRQ);
     ..
 }
 ```
@@ -925,7 +977,7 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 
 ### ixgbe_poll
 
-`ixgbe_poll`的实现参考如下，此处聚焦于收包流程:
+`ixgbe_poll`的实现参考如下，此处关注收包流程:
 
 ```c
 /**
@@ -937,49 +989,43 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
  **/
 int ixgbe_poll(struct napi_struct *napi, int budget)
 {
-	struct ixgbe_q_vector *q_vector =
-				container_of(napi, struct ixgbe_q_vector, napi);
-	struct ixgbe_adapter *adapter = q_vector->adapter;
-	struct ixgbe_ring *ring;
-	int per_ring_budget, work_done = 0;
-	bool clean_complete = true;
+    struct ixgbe_q_vector *q_vector =
+                container_of(napi, struct ixgbe_q_vector, napi);
+    struct ixgbe_adapter *adapter = q_vector->adapter;
+    struct ixgbe_ring *ring;
+    int per_ring_budget, work_done = 0;
+    bool clean_complete = true;
     ...
-	/* Exit if we are called by netpoll */
-	if (budget <= 0)
-		return budget;
+    // 依次处理接收队列，常规情况下调用的是ixgbe_clean_rx_irq函数
+    ixgbe_for_each_ring(ring, q_vector->rx) {
+        int cleaned = ring->xsk_pool ?
+                  ixgbe_clean_rx_irq_zc(q_vector, ring,
+                            per_ring_budget) :
+                  ixgbe_clean_rx_irq(q_vector, ring,
+                         per_ring_budget);
 
-	/* attempt to distribute budget to each queue fairly, but don't allow
-	 * the budget to go below 1 because we'll exit polling */
-	if (q_vector->rx.count > 1)
-		per_ring_budget = max(budget/q_vector->rx.count, 1);
-	else
-		per_ring_budget = budget;
-
-	ixgbe_for_each_ring(ring, q_vector->rx) {
-		int cleaned = ring->xsk_pool ?
-			      ixgbe_clean_rx_irq_zc(q_vector, ring,
-						    per_ring_budget) :
-			      ixgbe_clean_rx_irq(q_vector, ring,
-						 per_ring_budget);
-
-		work_done += cleaned;
-		if (cleaned >= per_ring_budget)
-			clean_complete = false;
-	}
-
-	/* If all work not completed, return budget and keep polling */
-	if (!clean_complete)
-		return budget;
-
-	/* all work done, exit the polling mode */
-	if (likely(napi_complete_done(napi, work_done))) {
-		if (adapter->rx_itr_setting & 1)
-			ixgbe_set_itr(q_vector);
-		if (!test_bit(__IXGBE_DOWN, &adapter->state))
-			ixgbe_irq_enable_queues(adapter,
-						BIT_ULL(q_vector->v_idx));
-	}
-
-	return min(work_done, budget - 1);
+        work_done += cleaned;
+        if (cleaned >= per_ring_budget)
+            clean_complete = false;
+    }
+    ...
+    /* all work done, exit the polling mode */
+    if (likely(napi_complete_done(napi, work_done))) {
+        ...
+    }
+    ...
 }
 ```
+
+## 参考资料
+
+1. http://arthurchiao.art/blog/linux-net-stack-implementation-rx-zh/
+
+2. https://mp.weixin.qq.com/s?__biz=MzI5NjQxNjMwNg==&mid=2247484551&idx=1&sn=582f805a146c8444d16d345f3499a873&chksm=ec45e1dadb3268cc3e3c8b5c5e87349c42a1b23d5fd1fc77acffe8763e5e45a4caf1c783e28c&scene=178&cur_album_id=2824589058847883264#rd
+
+3. [ixgbe网卡驱动 Ⅳ----收发包流程详解_ixgbe_msix_clean_rings_老王不让用的博客-CSDN博客](https://blog.csdn.net/wangquan1992/article/details/117450280)
+
+4. https://zhuanlan.zhihu.com/p/610334133
+
+5. 深入理解`Linux`网络
+6. https://www.codeleading.com/article/97993272809/

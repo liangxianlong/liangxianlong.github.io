@@ -403,39 +403,67 @@ module_init(ixgbe_init_module);
  * and a hardware reset occur.
  **/
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-{    
-    ...
-    // ent此处为ixgbe_pci_tbl变量，本质上就是根据ixgbe网卡型号选择ixgbe_info
+{    
+    ...
+    // ent此处为ixgbe_pci_tbl变量，本质上就是根据ixgbe网卡型号选择ixgbe_info
     const struct ixgbe_info *ii = ixgbe_info_tbl[ent->driver_data];
-    ...
-    /*
-     * pci_enable_device_mem()最终调用pci_write_config_word()
+    ...
+    /*
+     * pci_enable_device_mem()最终调用pci_write_config_word()
      * 向配置寄存器Command（0x04）中写入PCI_COMMAND_MEMORY（0x2），
-     * 允许网卡驱动访问网卡的Memory空间
-     */
-    err = pci_enable_device_mem(pdev);
-    ...
-    // 向配置寄存器Command（0x04）中写入PCI_COMMAND_MASTER（0x4），
-    // 允许网卡申请PCI总线控制权
-    pci_set_master(pdev);
-    // 保存配置空间
-    pci_save_state(pdev);
-    ...
-    // 分配net_device和ixgbe_adapter
-    netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
-    ...
-    adapter = netdev_priv(netdev); // 得到ixgbe_adapter的指针
-    ...
-    hw = &adapter->hw; // 得到ixgbe_hw的指针
-    ...
-    // 将BAR0中的总线地址映射成内存地址，赋给hw->hw_addr，
+     * 允许网卡驱动访问网卡的Memory空间
+     */
+    err = pci_enable_device_mem(pdev);
+    ...
+    // 向配置寄存器Command（0x04）中写入PCI_COMMAND_MASTER（0x4），
+    // 允许网卡申请PCI总线控制权
+    pci_set_master(pdev);
+    // 保存配置空间
+    pci_save_state(pdev);
+    ...
+    // 分配net_device和ixgbe_adapter
+    netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
+    ...
+    adapter = netdev_priv(netdev); // 得到ixgbe_adapter的指针
+    ...
+    hw = &adapter->hw; // 得到ixgbe_hw的指针
+    ...
+    // 将BAR0中的总线地址映射成内存地址，赋给hw->hw_addr，
     // 允许网卡驱动通过hw->hw_addr访问网卡的BAR0对应的Memory空间
-    hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
-			      pci_resource_len(pdev, 0));
-	adapter->io_addr = hw->hw_addr;
+    hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
+                  pci_resource_len(pdev, 0));
+    adapter->io_addr = hw->hw_addr;
     ...
     // 注册ixgbe_netdev_ops
     netdev->netdev_ops = &ixgbe_netdev_ops;
+    // 设置ethtool回调函数
+    ixgbe_set_ethtool_ops(netdev);
+    ...
+    // 读取BAR0对应的Memory空间的IXGBE_EEC
+    eec = IXGBE_READ_REG(hw, IXGBE_EEC(hw));
+    ...
+    // ixgbe_sw_init->get_invariants
+    // ixgbe_sw_init: 初始化ixgbe_adapter
+    err = ixgbe_sw_init(adapter, ii);
+    ...
+    // 获取mac地址
+    eth_platform_get_mac_address(&adapter->pdev->dev,
+				     adapter->hw.mac.perm_addr);
+    memcpy(netdev->dev_addr, hw->mac.perm_addr, netdev->addr_len);
+    ...
+    /* Set hw->mac.addr to permanent MAC address */
+	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
+    ...
+    // 根据FDIR/RSS设置adapter->num_tx/rx_queues
+    // 向PCI子系统请求中断
+    // 设置poll函数，分配ixgbe_q_vector，初始化napi并加入napi_list
+    // 分配发送/接收ring数组
+    err = ixgbe_init_interrupt_scheme(adapter);
+    ...
+    strcpy(netdev->name, "eth%d");
+	pci_set_drvdata(pdev, adapter);
+	err = register_netdev(netdev); // 注册netdev
+    ...
 }
 ```
 
@@ -1028,4 +1056,7 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 4. https://zhuanlan.zhihu.com/p/610334133
 
 5. 深入理解`Linux`网络
-6. https://www.codeleading.com/article/97993272809/
+
+6. [ixgbe网卡驱动（一） - 代码先锋网](https://www.codeleading.com/article/97993272809/)
+
+7. [ixgbe网卡驱动（二） - 代码先锋网](https://www.codeleading.com/article/43713272663/)

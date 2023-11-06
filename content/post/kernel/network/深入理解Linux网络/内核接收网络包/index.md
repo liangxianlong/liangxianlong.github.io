@@ -403,7 +403,7 @@ module_init(ixgbe_init_module);
  * and a hardware reset occur.
  **/
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-{    
+{
     ...
     // ent此处为ixgbe_pci_tbl变量，本质上就是根据ixgbe网卡型号选择ixgbe_info
     const struct ixgbe_info *ii = ixgbe_info_tbl[ent->driver_data];
@@ -448,11 +448,11 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
     ...
     // 获取mac地址
     eth_platform_get_mac_address(&adapter->pdev->dev,
-				     adapter->hw.mac.perm_addr);
+                     adapter->hw.mac.perm_addr);
     memcpy(netdev->dev_addr, hw->mac.perm_addr, netdev->addr_len);
     ...
     /* Set hw->mac.addr to permanent MAC address */
-	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
+    ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
     ...
     // 根据FDIR/RSS设置adapter->num_tx/rx_queues
     // 向PCI子系统请求中断
@@ -461,8 +461,8 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
     err = ixgbe_init_interrupt_scheme(adapter);
     ...
     strcpy(netdev->name, "eth%d");
-	pci_set_drvdata(pdev, adapter);
-	err = register_netdev(netdev); // 注册netdev
+    pci_set_drvdata(pdev, adapter);
+    err = register_netdev(netdev); // 注册netdev
     ...
 }
 ```
